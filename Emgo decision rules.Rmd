@@ -24,7 +24,7 @@ utility <- function(n=NA, h=NA, par=list(npar=c(1,1), hpar=c(1))){
 }
 ```
 
-Let first look at the untility function.
+Let's first look at the utility function.
 
 ```{r echo=FALSE}
 num=seq(1,2e5, length=100)
@@ -45,7 +45,7 @@ Now let's calculate expected utility over time, given a starting population, har
 ```{r echo=FALSE}
 
 Reps <- 1000
-T <- 30
+T <- 100
 N0 <- rnorm(Reps, 155000, 25000)
 Rmax <- rlnorm(Reps, log(0.15), 0.1)
 CC <- runif(Reps, 155000, 250000)
@@ -83,7 +83,7 @@ for(i in 1:Reps){
   for(t in 2:(T+1)){
     HarPol <- HarvestPolicy(n = N.obs[t-1], plist=H.pol)
     Results$HarPol[i,t-1] <- HarPol
-    Results$Har[i,t-1] <- Har[[HarPol]][i]
+    Results$Har[i,t-1] <- Har[[HarPol]][i]  #Should this decline to 0 as N declines to 0?  Yes.  
     E.N.pre <- N[t-1]*exp(Rmax[i]*(1 - (N[t-1]/CC[i])^Theta[i]))
     N.pre <- ifelse(E.N.pre <= 0,0,rlnorm(1,log(E.N.pre), sigma.proc[i]))
     N[t] <- ifelse(N.pre - Har[[HarPol]][i] <= 0,0,N.pre - Har[[HarPol]][i])
@@ -121,7 +121,7 @@ for(i in 1:Reps){
     Results$Har[i,t-1] <- Har[[HarPol]][i]
     E.N.pre <- N[t-1]*exp(Rmax[i]*(1 - (N[t-1]/CC[i])^Theta[i]))
     N.pre <- ifelse(E.N.pre <= 0,0,rlnorm(1,log(E.N.pre), sigma.proc[i]))
-    N[t] <- ifelse(N.pre <= 0,0,N.pre - Har[[HarPol]][i])
+    N[t] <- ifelse(N.pre - Har[[HarPol]][i] <= 0,0,N.pre - Har[[HarPol]][i])
     N.obs[t] <- ifelse(N[t]<=0,0,rnorm(1,N[t], cv.obs*N[t]))
   }
   Results$N[i,] <- N[-1]
