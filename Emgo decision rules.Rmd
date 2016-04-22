@@ -15,10 +15,11 @@ HarvestPolicy <- function(n, plist = list()){
 
 ilogit <- function(x){exp(x)/(1+exp(x))}
 
-utility <- function(n=NA, h=NA, par=list(npar=c(1,1), hpar=c(1))){
+utility <- function(n=NA, h=NA, par=list(npar=c(1,1), hpar=c(1,1))){
   #util.n <- 1 - exp(-par$npar[1]*n)
   util.n <- plogis(q=n, par$npar[1], par$npar[2])
-  util.h <- 1 - exp(-par$hpar[1]*h)
+  #util.h <- 1 - exp(-par$hpar[1]*h)
+  util.h <- plogis(q=h, par$hpar[1], par$hpar[2])
   util <- (util.n + util.h)/2
   return(util)
 }
@@ -31,7 +32,7 @@ num=seq(1,2e5, length=100)
 har=seq(1,1.5e4,length=100)
 reward=matrix(NA, length(num), length(har))
 for(i in 1:length(har)){
-  reward[,i] = utility(n=num, h=har[i], par=list(npar=c(15.7e4, 3e4), hpar=1e-4))
+  reward[,i] = utility(n=num, h=har[i], par=list(npar=c(10e4, 2e4), hpar=c(5e3, 1.5e3)))
 }
 image(reward, x=num, y=har)
 
@@ -45,7 +46,7 @@ Now let's calculate expected utility over time, given a starting population, har
 ```{r echo=FALSE}
 
 Reps <- 1000
-T <- 100
+T <- 10
 N0 <- rnorm(Reps, 155000, 25000)
 Rmax <- rlnorm(Reps, log(0.15), 0.1)
 CC <- runif(Reps, 155000, 250000)
@@ -91,7 +92,8 @@ for(i in 1:Reps){
   }
   Results$N[i,] <- N[-1]
   Results$N.obs[i,] <- N.obs[-1]
-  Results$Utility[i,] <- utility(n = Results$N[i,], h = Results$Har[i,],par=list(npar=c(15.7e4, 3e4), hpar=1e-4))
+  Results$Utility[i,] <- utility(n = Results$N[i,], h = Results$Har[i,],
+                                 par=list(npar=c(10e4, 2e4), hpar=c(5e3, 1.5e3)))
 }
 e.util[ii,jj] <- mean(apply(Results$Utility,1,sum))
 }}
