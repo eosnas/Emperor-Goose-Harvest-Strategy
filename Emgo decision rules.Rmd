@@ -1,7 +1,7 @@
 ---
 title: "Emperor Goose Decision Rules"
 author: "Erik Osnas"
-date: "May 10, 2016"
+date: "April 8, 2016"
 output: html_document
 ---
 Here I add a "Harvest Regulation Objective" to the value/utility function.  Modified from *MSY.Rmd file."
@@ -84,7 +84,7 @@ num=seq(1,2e5, length=100)
 har=seq(1,2e4,length=100)
 reward=matrix(NA, length(num), length(har))
 for(i in 1:length(har)){
-  reward[,i] = utility(n=num, h=har[i], par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)))
+  reward[,i] = utility(n=num, h=har[i], par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)), policy="Green", policy.parameters=c("Red"=0.25, "Yellow"=0.5, "Green"=1))
 }
 #pdf("plot2.pdf")
 image(reward, x=num, y=har)
@@ -103,7 +103,7 @@ OK, now find the harvest rule that maximizes expected utility.
 posterior <- TRUE
 filename <- "summer_theta_logistic_output.txt"
 Reps <- 1500   #1500 works well
-T <- 200
+T <- 100
 a <- 0.0001   #functional response parameter for harvest, ensures that har --> 0 as N --> 0
 d <- 0.99     #utility discounting, 1 - discount rate
 if(posterior==FALSE){  #need to modify to match below at posterior == TRUE
@@ -130,12 +130,9 @@ t.min <- 10000
 t.max <- 50000
 t.delta <- 1000
 
-Har = list(Red = rlnorm(Reps, log(4000), 0.1), #increased for crippling loss ~25%
+Har = list(Red = rlnorm(Reps, log(3000), 0.1), 
               Yellow = rlnorm(Reps, log(7000), 0.1), 
               Green = rlnorm(Reps, log(15000), 0.2))
-plot(density(Har$Red), xlim=c(0,30000), col="red", main="Harvest Distribution Under Each Policy", lwd=2)
-lines(density(Har$Yellow), col="orange", lwd=2)
-lines(density(Har$Green), col="green", lwd=2)
 ## Question:  Is harvest modelled correctly?  for each policy should be a grand mean as above and then a year effect with smaller variance?
 thresholds = seq(t.min, t.max, by=t.delta)
 e.util = matrix(NA, nrow=length(thresholds), ncol=length(thresholds))
@@ -168,7 +165,9 @@ for(i in 1:Reps){
   Results$N[i,] <- N[-1]
   Results$N.obs[i,] <- N.obs[-1]
   Results$Utility[i,] <- utility(n = Results$N[i,], h = Results$Har[i,], 
-                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)))
+                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)), 
+                                 policy=Results$HarPol[i,], 
+                                 policy.parameters=c("Red"=0.25, "Yellow"=0.5, "Green"=1))
 }
 discount <- matrix(d^c(0:(T-1)), nrow=Reps, ncol=T, byrow=TRUE)
 e.util[ii,jj] <- mean(apply(Results$Utility*discount,1,sum))
@@ -207,7 +206,9 @@ for(i in 1:Reps){
   Results$N[i,] <- N[-1]
   Results$N.obs[i,] <- N.obs[-1]
   Results$Utility[i,] <-  utility(n = Results$N[i,], h = Results$Har[i,], 
-                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)))
+                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)), 
+                                 policy=Results$HarPol[i,], 
+                                 policy.parameters=c("Red"=0.25, "Yellow"=0.5, "Green"=1))
 }
 
 
