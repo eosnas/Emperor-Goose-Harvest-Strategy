@@ -1,13 +1,13 @@
 ---
 title: "Emperor Goose Decision Rules"
 author: "Erik Osnas"
-date: "May 10, 2016"
+date: "May 3, 2016"
 output: html_document
 ---
-Here I add a "Harvest Regulation Objective" to the value/utility function.  Modified from *MSY.Rmd file."
+In this file, I add an EVPI calculation to *MSY.Rmd file
+
 ```{r}
 ## Define important functions
-
 HarvestPolicy <- function(n, plist = list()){
   hpol <- ifelse(n < plist[[1]], "Red", ifelse(n < plist[[2]],"Yellow","Green"))
   return(hpol)
@@ -15,7 +15,7 @@ HarvestPolicy <- function(n, plist = list()){
 
 ilogit <- function(x){exp(x)/(1+exp(x))}
 
-utility <- function(n=NA, h=NA, policy=NULL, par=list(npar=c(1,1), hpar=c(1,1)), weight=c(0.5, 0.5), fn=c("logistic", "linear"), policy.parameters=c("Red"=1, "Yellow"=1, "Green"=1)){
+utility <- function(n=NA, h=NA, par=list(npar=c(1,1), hpar=c(1,1)), weight=c(0.5, 0.5), fn=c("logistic", "linear")){
   if(fn[1]=="exp"){util.n <- 1 - exp(-par$npar[1]*n)}
   if(fn[2]=="exp"){util.h <- 1 - exp(-par$hpar[1]*h)}
   if(fn[1]=="logistic"){util.n <- plogis(q=n, par$npar[1], par$npar[2])}
@@ -24,35 +24,43 @@ utility <- function(n=NA, h=NA, policy=NULL, par=list(npar=c(1,1), hpar=c(1,1)),
   if(fn[2]=="linear"){util.h <- ifelse(h <= par$hpar[1], h/par$hpar[1], 1)}
   if(fn[1]=="msy"){util.n <- rep(0,length(h))}
   if(fn[2]=="msy"){util.h <- h}
-  if(length(policy)>0){
-    if(sum(!policy%in%names(policy.parameters))==0){ util.h <- util.h*policy.parameters[policy]}
-    else(stop("Names of policy parameters do not match policy"))
-  }
   
-  if(length(n)==1){
-    util <- matrix(c(rep(util.n, length(h)), util.h),length(h),2)%*%matrix(weight,2,1)
-  }
-  if(length(h)==1){
-    util <- matrix(c(util.n, rep(util.h, length(n))),length(n),2)%*%matrix(weight,2,1)
-  }
-  if(length(n)==length(h)){
-    util <- matrix(c(util.n, util.h),length(h),2)%*%matrix(weight,2,1)
-  }
+  util <- matrix(c(util.n, util.h),length(h),2)%*%matrix(weight,2,1)
   return(util)
 }
 ```
 
 Let's first look at a utility function.
-Use the utility function that was elicited from Eric Tayor on 27 April 2016.  
+
+```{r echo=FALSE, eval = TRUE}
+num=seq(1,2e5, length=100)
+har=seq(1,1.5e4,length=100)
+reward=matrix(NA, length(num), length(har))
+for(i in 1:length(har)){
+  reward[,i] = #utility(n=num, h=har[i], par=list(npar=c(10e4, 2e4), hpar=c(5e3, 1.5e3)))
+    utility(n = num, h = har[i],
+                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)),
+                                 weight=c(0,1), fn=c("msy","msy"))
+}
+image(reward, x=num, y=har)
+text(x=175000, y=14000, labels="+", font = 2, cex = 2)
+text(x=25000, y=1000, labels="-", font = 2, cex = 2)
+
+plot(num, reward[,1])
+
+plot(har, reward[100,])
+```
+
+Now let use the utility function that was elicited from Eric Taylor on 27 April 2016.  
 
 ```{r eval=TRUE}
-# results from Elicitation of utiity function from Eric Tayor
+# results from Elicitation of utility function from Eric Taylor
 # on 4-27-2016
 u1 <- list(N = c(0,50,60,80,100, 150, 175, 200), 
            U = c(0,0, 0, 0.6, 0.75, 0.9, 1, 1))
 u2 <- list(N = c(0,60,80,100,125,155, 200), 
            U = c(0,0.25,0.5,0.625, 0.75, 0.875, 1))
-#pdf("plot1.pdf")
+		   
 plot(u1$N, u1$U, pch=16, col=1)
 points(u2$N, u2$U, pch=16, col=2)
 
@@ -60,11 +68,6 @@ u <- rbind(as.data.frame(u1),as.data.frame(u2))
 u$N2 <- u$N*u$N
 u$N3 <- u$N*u$N*u$N 
 
-#fit1 <- lm(U~N+N2+N3-1, data = u)
-#summary(fit1)
-#n <- seq(0, 200, by=1)
-#lines(n, coef(fit1)[1]*n+coef(fit1)[2]*(n^2)+coef(fit1)[3]*(n^3))
-#doesn't quite fit, try logistic
 library(bbmle)
 nloglike <- function(m = 80, s=20, sigma=0.1){
   -sum(dnorm(U, plogis(N, location=m, scale=s), sigma, log=TRUE))
@@ -73,10 +76,14 @@ nloglike <- function(m = 80, s=20, sigma=0.1){
 fit2 <- mle2(nloglike, start=list(m=80, s=20, sigma=0.1), data=u)
 summary(fit2)
 lines(1:200, plogis(1:200, location=coef(fit2)[1], scale=coef(fit2)[2]))
-#dev.off()
 ```
-That seems to look reasonable.  We had difficultly understanding how utility changed with harvest, and we ran out of time.  For now we will use a linear (risk-nutral) utility function for harvest where utility is linear for harvest <= 15000 and 1 otherwise.   
+That seems to look reasonable.  We had difficultly understanding how utility changed with harvest, and we ran out of time.  For now we will use a linear (risk-neutral) utility function for harvest where utility is linear for harvest <= 15000 and 1 otherwise.   
 
+```{r eval=TRUE}
+h <- seq(1,20000, by=100)
+hutility <- function(x){ifelse(x <= 15000, x/15000, 1)}
+plot(h, sapply(h, hutility), type="l")
+```
 Putting both utility function together and weighting them equally gives:
 
 ```{r eval=TRUE}
@@ -86,24 +93,23 @@ reward=matrix(NA, length(num), length(har))
 for(i in 1:length(har)){
   reward[,i] = utility(n=num, h=har[i], par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)))
 }
-#pdf("plot2.pdf")
-image(reward, x=num, y=har)
+par(mfrow=c(1,3))
+image(reward, x=num, y=har, xlab="Population Size", ylab="Harvest")
 text(x=175000, y=14000, labels="+", font = 2, cex = 2)
 text(x=25000, y=1000, labels="-", font = 2, cex = 2)
 
-plot(num, reward[,1])
+plot(num, reward[,1], xlab="Population Size", ylab="Utility at no Harvest")
 
-plot(har, reward[100,])
-#dev.off()
+plot(har, reward[100,], xlab="Harvest", ylab="Utility at 200K geese")
+par(mfrow=c(1,1))
 ```
-
 OK, now find the harvest rule that maximizes expected utility.
 
-```{r echo = TRUE}
+```{r echo = FALSE}
 posterior <- TRUE
 filename <- "summer_theta_logistic_output.txt"
-Reps <- 1500   #1500 works well
-T <- 200
+Reps <- 200   #1500 works well
+T <- 100
 a <- 0.0001   #functional response parameter for harvest, ensures that har --> 0 as N --> 0
 d <- 0.99     #utility discounting, 1 - discount rate
 if(posterior==FALSE){  #need to modify to match below at posterior == TRUE
@@ -130,59 +136,62 @@ t.min <- 10000
 t.max <- 50000
 t.delta <- 1000
 
-Har = list(Red = rlnorm(Reps, log(4000), 0.1), #increased for crippling loss ~25%
+Har = list(Red = rlnorm(Reps, log(3000), 0.1), 
               Yellow = rlnorm(Reps, log(7000), 0.1), 
               Green = rlnorm(Reps, log(15000), 0.2))
-plot(density(Har$Red), xlim=c(0,30000), col="red", main="Harvest Distribution Under Each Policy", lwd=2)
-lines(density(Har$Yellow), col="orange", lwd=2)
-lines(density(Har$Green), col="green", lwd=2)
-## Question:  Is harvest modelled correctly?  for each policy should be a grand mean as above and then a year effect with smaller variance?
+## Question:  Is harvest modelled correctly?  for each policy should be a grand
+## mean as above and then a year effect with smaller variance?  Or should actual
+## harvest be a drawn from a Poisson process with mean defined above?  
 thresholds = seq(t.min, t.max, by=t.delta)
 e.util = matrix(NA, nrow=length(thresholds), ncol=length(thresholds))
 
-for(ii in 1:length(thresholds)){for(jj in ii:length(thresholds)){
-  
-#define harvest thresholds
-H.pol = list(Red = thresholds[ii], Yellow = thresholds[jj])
-
-Results = list(N=array(NA, dim=c(Reps,T)), 
+for(ii in 1:length(thresholds)){for(jj in ii:length(thresholds)){ 
+  #define harvest thresholds
+  H.pol = list(Red = thresholds[ii], Yellow = thresholds[jj])
+  Results = list(N=array(NA, dim=c(Reps,T)), 
                N.obs = array(NA, dim=c(Reps,T)), 
                HarPol = array(NA, dim=c(Reps,T)),
                Har = array(NA, dim=c(Reps,T)),
                Utility = array(NA, dim=c(Reps,T))
                )
 
-for(i in 1:Reps){
-  N <- N.obs<- numeric()
-  N[1] <- N0[i]
-  N.obs[1] <- 32550 #Sum_TOT from 2014 #rnorm(1,N[1], cv.obs*N[1])
-  
-  for(t in 2:(T+1)){
-    HarPol <- HarvestPolicy(n = N.obs[t-1], plist=H.pol)
-    Results$HarPol[i,t-1] <- HarPol
-    Results$Har[i,t-1] <- (1-exp(-a*N[t-1]))*Har[[HarPol]][i]  #added functional response  
-    E.N.pre <- N[t-1]*exp(Rmax[i]*(1 - (N[t-1]/CC[i])^Theta[i])) - Results$Har[i,t-1]  
-    N[t] <- ifelse(E.N.pre <= 0,0,rlnorm(1,log(E.N.pre/CC[i]), sigma.proc[i])*CC[i])
-    N.obs[t] <- ifelse(N[t]<=0,0,rnorm(1,N[t]*q[i], cv.obs[i]*N[t]*q[i]))
-  }
-  Results$N[i,] <- N[-1]
-  Results$N.obs[i,] <- N.obs[-1]
-  Results$Utility[i,] <- utility(n = Results$N[i,], h = Results$Har[i,], 
-                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)))
-}
-discount <- matrix(d^c(0:(T-1)), nrow=Reps, ncol=T, byrow=TRUE)
-e.util[ii,jj] <- mean(apply(Results$Utility*discount,1,sum))
+    for(i in 1:Reps){
+      N <- N.obs<- numeric()
+      N[1] <- N0[i]
+      N.obs[1] <- 32550 #Sum_TOT from 2014 #rnorm(1,N[1], cv.obs*N[1])
+      for(t in 2:(T+1)){
+        HarPol <- HarvestPolicy(n = N.obs[t-1], plist=H.pol)
+        Results$HarPol[i,t-1] <- HarPol
+        Results$Har[i,t-1] <- (1-exp(-a*N[t-1]))*Har[[HarPol]][i]  #added functional response  
+        E.N.pre <- N[t-1]*exp(Rmax[i]*(1 - (N[t-1]/CC[i])^Theta[i])) - Results$Har[i,t-1]  
+        N[t] <- ifelse(E.N.pre <= 0,0,rlnorm(1,log(E.N.pre/CC[i]), sigma.proc[i])*CC[i])
+        N.obs[t] <- ifelse(N[t]<=0,0,rnorm(1,N[t]*q[i], cv.obs[i]*N[t]*q[i]))
+      }
+      Results$N[i,] <- N[-1]
+      Results$N.obs[i,] <- N.obs[-1]
+      Results$Utility[i,] <- utility(n = Results$N[i,], h = Results$Har[i,],
+                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)),
+                                 weight=c(0,1), fn=c("msy","msy"))
+    }
+    discount <- matrix(d^c(0:(T-1)), nrow=Reps, ncol=T, byrow=TRUE)
+    e.util[ii,jj] <- mean(apply(Results$Utility*discount,1,sum))
 }}
 
 smart.spot = which(e.util==max(e.util, na.rm=TRUE), arr.ind = TRUE)
 harvest.rule=list(Red=thresholds[smart.spot[1]], Yellow=thresholds[smart.spot[2]])
 harvest.rule
 ```
+The optimal thresholds are 
+
+Closure at  | Liberalize at 
+----------- | -------------
+harvest.rule$Red | harvest.rule$Yellow
+
+Simulate dynamics at smart threshold:
 
 ```{r}
-#Simulate dynamics at smart threshold
-H.pol = harvest.rule
-#H.pol = list(Red = 1e10, Yellow = 1e10)
+#H.pol = harvest.rule
+H.pol = list(Red = 12000, Yellow = 20000)
 #H.pol = list(Red = 0, Yellow = 0)
 
 Results = list(N=array(NA, dim=c(Reps,T)), 
@@ -206,17 +215,16 @@ for(i in 1:Reps){
   }
   Results$N[i,] <- N[-1]
   Results$N.obs[i,] <- N.obs[-1]
-  Results$Utility[i,] <-  utility(n = Results$N[i,], h = Results$Har[i,], 
-                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)))
+  Results$Utility[i,] <-  utility(n = Results$N[i,], h = Results$Har[i,],
+                                 par=list(npar=coef(fit2)[1:2]*1000, hpar=c(15000, 1)),
+                                 weight=c(0,1), fn=c("msy","msy"))
 }
+
 
 
 p.regs <- as.matrix(table(Results$HarPol)/(T*Reps))
 regs <- matrix(0, 3, 1)
 row.names(regs) <- c("Red","Yellow","Green")
-
-#library(scales)
-#pdf("plot3.pdf")
 n.plot = 100
 plot(1,1, type="n",xlim=c(0, T), ylim=c(0, 1e5), xlab="Year", ylab="Obs. Population")
 for(i in 1:min(100,Reps)){
@@ -226,14 +234,12 @@ abline(h=H.pol, col=c("Red", "Yellow"), lwd=3)
 text(x=T*(1:dim(p.regs)[1])/10, y=9000, labels=row.names(p.regs))
 text(x=T*(1:dim(p.regs)[1])/10, y=5000, labels=round(p.regs,2))
 
-plot(1,1, type="n",xlim=c(0, T), ylim=c(0, 3e5), xlab="Year", ylab="True Population")
+plot(1,1, type="n",xlim=c(0, T), ylim=c(0, 4e5), xlab="Year", ylab="True Population")
 for(i in 1:min(100,Reps)){
   lines(1:T, Results$N[i,], col=1)
 }
 mtext(paste("Pr(extinction) = ",round(sum(Results$N[,100]<1)/Reps,2)), side=3, font=2, line=1)
-#dev.off()
 
-#pdf("plot3.2.pdf")
 image(e.util, axes=FALSE, col=terrain.colors(10))
 axis(1, at=seq(0,1, by=0.2), labels=round(seq(t.min, t.max, length=6),0))
 axis(2, at=seq(0,1, by=0.2), labels=round(seq(t.min, t.max, length=6),0))
@@ -241,7 +247,6 @@ points(smart.spot[1,1]/length(thresholds), smart.spot[1,2]/length(thresholds), p
 mtext("Closure Threshold (Red Zone)", 1, line=3, font=2)
 mtext("Restriction Threshold (Yellow Zone)", 2, line=3, font=2)
 mtext(paste("Expected Utility over ",T,"years, discount = ",1-d), 3, line=2, font=2)
-#dev.off()
 
 plot(1,1, type="n",xlim=c(0, T), ylim=c(0, 75000), xlab="Year", ylab="Population")
 for(i in 1:min(10,Reps)){
@@ -254,5 +259,104 @@ for(i in 1:min(10,Reps)){
   lines(1:T, Results$N[i,], col=1, lwd=2)
   lines(1:T, Results$N.obs[i,]/post$q[spots[i],1], col=2, lwd=2)
 }
-#dev.off()
+```
+```{r }
+# Here I calculate EVPI
+# EVPI = E[with certainty] - E[with uncertainty]
+# First define a function to optimize:
+filename <- "summer_theta_logistic_output.txt"
+post <- dget(file=filename)
+
+eutil <- function(Thresholds = c("Red"=20000, "Yellow"=30000), maxT = 10, iters = 100, 
+                  Nobs1 = 32550, upars=list(NA)){
+  #par is a list of parameters (from posterior estimates)
+  with(upars, {
+    #define harvest thresholds
+    H.pol = as.list(Thresholds)
+    
+    Har = list(Red = rlnorm(iters, log(3000), 0.1), 
+              Yellow = rlnorm(iters, log(7000), 0.1), 
+              Green = rlnorm(iters, log(15000), 0.2)) 
+
+    Results = list(N=array(NA, dim=c(iters,maxT)), 
+               N.obs = array(NA, dim=c(iters,maxT)), 
+               HarPol = array(NA, dim=c(iters,maxT)),
+               Har = array(NA, dim=c(iters,maxT)),
+               Utility = array(NA, dim=c(iters,maxT))
+               )
+
+    for(i in 1:iters){
+      N <- N.obs<- numeric()
+      N[1] <- N.tot[length(N.tot)]
+      N.obs[1] <- Nobs1 #Sum_TOT from 2014 
+  
+    for(t in 2:(maxT+1)){
+      HarPol <- HarvestPolicy(n = N.obs[t-1], plist=H.pol)
+      Results$HarPol[i,t-1] <- HarPol
+      Results$Har[i,t-1] <- (1-exp(-a*N[t-1]))*Har[[HarPol]][i]  #added functional response  
+      E.N.pre <- N[t-1]*exp(r.max*(1 - (N[t-1]/CC)^theta)) - Results$Har[i,t-1]  
+      N[t] <- ifelse(E.N.pre <= 0,0,rlnorm(1,log(E.N.pre/CC), sigma.proc)*CC)
+      N.obs[t] <- ifelse(N[t]<=0,0,rnorm(1,N[t]*q, cv.obs*N[t]*q))
+    }
+    Results$N[i,] <- N[-1]
+    Results$N.obs[i,] <- N.obs[-1]
+    Results$Utility[i,] <- utility(n = Results$N[i,], h = Results$Har[i,], par=utility.pars)
+    }
+	discount <- matrix(d^c(0:(maxT-1)), nrow=iters, ncol=maxT, byrow=TRUE)
+    e.util <- mean(apply(Results$Utility*discount,1,sum))
+    return(e.util)
+  })
+}
+
+
+parameters <- lapply(post, function(x){x[1,]})
+parameters$a <- 0.0001   #functional response parameter for harvest, ensures that har --> 0 as N --> 0
+parameters$d <- 0.99     #utility discounting, 1 - discount rate
+parameters$cv.obs <- rnorm(1, 0.07, 0.003)  #from lm(dat$SUM_TOT_SE~dat$SUM_TOT-1)
+parameters$utility.pars <- list(npar=c(85, 18)*1000, hpar=c(15000, 1))
+
+eutil(upars=parameters)
+
+optim(par=c(Red=20000, Yellow=30000), fn=eutil, control=list(fnscale= -1), upars=parameters, iters=100, maxT=200)
+
+##Now try to iterate through threshold to find expected utility surface
+t.min <- 10000
+t.max <- 50000
+t.delta <- 1000
+
+thresholds = seq(t.min, t.max, by=t.delta)
+e.util = matrix(NA, nrow=length(thresholds), ncol=length(thresholds))
+T <- 10
+Reps <- 100
+dims <- dim(post$N.tot)
+maxplots <- 30
+spots <- sample(1:dims[1], maxplots)
+pdf("plot2.pdf")
+for(j in 1:maxplots){
+parameters <- lapply(post, function(x){x[spots[j],]})
+parameters$a <- 0.0001   #functional response parameter for harvest, ensures that har --> 0 as N --> 0
+parameters$d <- 0.99     #utility discounting, 1 - discount rate
+parameters$cv.obs <- rnorm(1, 0.07, 0.003)  #from lm(dat$SUM_TOT_SE~dat$SUM_TOT-1)
+parameters$utility.pars <- list(npar=c(85, 18)*1000, hpar=c(15000, 1))
+
+for(ii in 1:length(thresholds)){for(jj in ii:length(thresholds)){ 
+  e.util[ii,jj] <- eutil(Thresholds=c(Red = thresholds[ii], Yellow = thresholds[jj]), upars=parameters, iters=Reps, maxT=T)
+}}
+
+smart.spot = which(e.util==max(e.util, na.rm=TRUE), arr.ind = TRUE)
+harvest.rule=list(Red=thresholds[smart.spot[1]], Yellow=thresholds[smart.spot[2]])
+harvest.rule
+
+image(e.util, axes=FALSE, col=terrain.colors(10))
+axis(1, at=seq(0,1, by=0.2), labels=round(seq(t.min, t.max, length=6),0))
+axis(2, at=seq(0,1, by=0.2), labels=round(seq(t.min, t.max, length=6),0))
+points(smart.spot[1,1]/length(thresholds), smart.spot[1,2]/length(thresholds), pch=16)
+mtext("Closure Threshold (Red Zone)", 1, line=3, font=2)
+mtext("Restriction Threshold (Yellow Zone)", 2, line=3, font=2)
+mtext(paste("Expected Utility over ",T,"years, discount = ",1-parameters$d), 3, line=2, font=2)
+}
+dev.off()
+
+
+
 ```
