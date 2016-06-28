@@ -1,12 +1,11 @@
 ---
-title: "Emperor Goose Decision Rules"
+title: "DRAFT:  Emperor Goose Decision Rules"
 author: "Erik Osnas and Charles Frost"
 date: "June 27, 2016"
 output: html_document
 ---
 
 This is an Rmarkdown document.  Code and associated files that produced this document can be found at https://github.com/eosnas/Emperor-Goose-Harvest-Strategy.git
-
 
 ```{r glob_opts, include=FALSE}
 knitr::opts_chunk$set(cache=TRUE, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE)
@@ -230,7 +229,7 @@ Given the utility functions and assumptions about harvest under each policy, des
 Harvest Policy   | Summer Index Value  | Total Population (Median)
 ---------------------  | ------------ | -------------------
 Very Restricted (Red) | $N_t <$ `r as.integer(thresholds[smart.spot[1]])` | $Y_t <$ `r as.integer(round(thresholds[smart.spot[1]]/median(post$q),0))`  
-Restricted (Yellow) | `r as.integer(thresholds[smart.spot[1]])` $\leq N_t <$ `r as.integer(thresholds[smart.spot[2]])` | `r as.integer(round(thresholds[smart.spot[1]]/median(post$q),0))` $\leq Y_t <$ `r as.integer(round(thresholds[smart.spot[1]]/median(post$q),0))` 
+Restricted (Yellow) | `r as.integer(thresholds[smart.spot[1]])` $\leq N_t <$ `r as.integer(thresholds[smart.spot[2]])` | `r as.integer(round(thresholds[smart.spot[1]]/median(post$q),0))` $\leq Y_t <$ `r as.integer(round(thresholds[smart.spot[2]]/median(post$q),0))` 
 Traditional (Green) | $N_t \geq$ `r as.integer(thresholds[smart.spot[2]])` | $Y_t \geq$ `r as.integer(round(thresholds[smart.spot[2]]/median(post$q),0))`  
 
 
@@ -963,6 +962,78 @@ Mean total population size under this policy is `r as.integer(round(mean(Results
 ```{r freq_msy} 
 t(p.regs)
 ```
+
+# Predicted Effect of 3-year Traditional Season
+The predicted population response under an experimental 3-year "traditional" season was modeled.  We assumed the most pessimistic population scenario where harvest is was log normally distributed with log mean of 20,000 and log variance of 0.1.  All other parameter came from the posterior of the theta-logistic model.  We found that population decline was highly likely, often > 50% of the current population, see figures below.  
+
+```{r exp_season}
+T <- 3
+
+Har = list(Red = rlnorm(Reps, log(4000), 0.1), #increased for crippling loss ~25%
+              Yellow = rlnorm(Reps, log(7000), 0.1), 
+              Green = rlnorm(Reps, log(20000), 0.1))
+
+#Normal harvest (red) for three years
+Results = list(N=array(NA, dim=c(Reps,T)), 
+               N.obs = array(NA, dim=c(Reps,T)), 
+               HarPol = array(NA, dim=c(Reps,T)),
+               Har = array(NA, dim=c(Reps,T)),
+               Utility = array(NA, dim=c(Reps,T))
+               )
+for(i in 1:Reps){
+  N <- N.obs<- numeric()
+  N[1] <- N0[i]
+  N.obs[1] <- N.last 
+  
+  for(t in 2:(T+1)){
+    HarPol <- "Red"
+    Results$HarPol[i,t-1] <- HarPol
+    Results$Har[i,t-1] <- (1-exp(-a*N[t-1]))*Har[[HarPol]][i]  #added functional response  
+    E.N.pre <- N[t-1]*exp(Rmax[i]*(1 - (N[t-1]/CC[i])^Theta[i])) - Results$Har[i,t-1]  
+    N[t] <- ifelse(E.N.pre <= 0,0,rlnorm(1,log(E.N.pre/CC[i]), sigma.proc[i])*CC[i])
+    N.obs[t] <- ifelse(N[t]<=0,0,rnorm(1,N[t]*q[i], cv.obs[i]*N[t]*q[i]))
+  }
+  Results$N[i,] <- N[-1]
+  Results$N.obs[i,] <- N.obs[-1]
+  Results$Utility[i,] <-  utility(n = Results$N[i,], h = Results$Har[i,], fn=c("msy", "msy"))
+}
+Normal <- Results
+#High harvest for 3 years
+Results = list(N=array(NA, dim=c(Reps,T)), 
+               N.obs = array(NA, dim=c(Reps,T)), 
+               HarPol = array(NA, dim=c(Reps,T)),
+               Har = array(NA, dim=c(Reps,T)),
+               Utility = array(NA, dim=c(Reps,T))
+               )
+for(i in 1:Reps){
+  N <- N.obs<- numeric()
+  N[1] <- N0[i]
+  N.obs[1] <- N.last 
+  
+  for(t in 2:(T+1)){
+    HarPol <- "Green"
+    Results$HarPol[i,t-1] <- HarPol
+    Results$Har[i,t-1] <- (1-exp(-a*N[t-1]))*Har[[HarPol]][i]  #added functional response  
+    E.N.pre <- N[t-1]*exp(Rmax[i]*(1 - (N[t-1]/CC[i])^Theta[i])) - Results$Har[i,t-1]  
+    N[t] <- ifelse(E.N.pre <= 0,0,rlnorm(1,log(E.N.pre/CC[i]), sigma.proc[i])*CC[i])
+    N.obs[t] <- ifelse(N[t]<=0,0,rnorm(1,N[t]*q[i], cv.obs[i]*N[t]*q[i]))
+  }
+  Results$N[i,] <- N[-1]
+  Results$N.obs[i,] <- N.obs[-1]
+  Results$Utility[i,] <-  utility(n = Results$N[i,], h = Results$Har[i,], fn=c("msy", "msy"))
+}
+par(mfrow=c(1,2), pty="s")
+hist((Results$N[,3]-Normal$N[,3])/Normal$N[,3], col="lightgray", main="", xlab="Proportional Change After 3 Years", breaks=20)
+require(scales)
+plot(0:3, 1:4, type="n", ylim=c(0, 5e5), ylab="Population", xlab="Year")
+for(i in 1:1000){
+  lines(0:3, c(N0[i],Results$N[i,]), col=alpha("gray50", 0.5))
+}
+par(mfrow=c(1,1), pty="m")
+```
+
+
+
 # Summary
 The main conclusions of this work are summarized as:  
 
@@ -971,4 +1042,5 @@ The main conclusions of this work are summarized as:
 * The exact location of harvest thresholds were highly dependent of the realized harvest model.  Therefore, the value of information on harvest is high.  This could best be addressed by observing the harvest consequence of a liberal, "traditional," harvest season during a short (1-3 years) series of seasons.  
 * After gaining additional data on harvest under a liberal season, the model should be updated and new policy thresholds derived.  
 * All modeled scenarios resulted in a relatively high frequency of closed seasons.  Thus, closed seasons should be expected in the future in order to maintain the emperor goose population and harvests into the future.  
+* There is substantial risk of a large (~50%) population decline under the most pessimistic scenario of a 3-year experimental "traditional" season. Thus, careful monitoring and emergency closure of the experimental season may be necessary.   
  
