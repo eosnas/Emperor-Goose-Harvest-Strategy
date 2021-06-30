@@ -1,0 +1,54 @@
+
+    model{
+    # Priors and constraints
+    q ~ dunif(0.01, 1) #harvest/population adjustment factor, #dunif(0.01, 1) worked
+    #dbeta(1, 5) or dunif(0, 1) or dbeta(2, 5)--did not converge in 1mil.   
+    c ~ dbeta(50, 150)    # c <- 0.25 for constant, distribution approx. from Dooley
+    r.max ~  dlnorm(log(0.09), 0.3)T(0, 0.2) #Prior for r max, approximated from Dooley report & pers. comm. on 5/9/16
+    # allows some very high values to r.max > 0.3, try truncation
+    #also tried: dunif(0.05, 0.25), dunif(0, 0.2), and dunif(0, 0.3)
+    theta ~ dlnorm(log(1.76), 0.25)T(1, 3)  #theta-logistic parameter from Dooley report & pers. comm. on 5/9/16
+    # allow much too high theta values > 100 in posterior, try truncation 
+    #also used dunif(1,3)
+    CC ~ dunif(50000, 400000) #<-- converged but gives very high CC and upper tail on N.tot
+    #dunif(100000,250000) works but dlnorm(log(200000), 0.2)T(0, 400000) does not 
+    sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
+    tau.proc <- pow(sigma.proc, -2)
+    #model of missing harvest data
+    m.har ~ dnorm(4081, 0.00001)
+    sigma.har ~ dunif(0, 3000)
+    tau.har <- pow(sigma.har, -2)
+    for(t in 1:T){ #T is number of data years before start of AMBCC season
+      har.obs[t] ~ dnorm(m.har, tau.har)   #dbeta(214, 786)
+      har[t] <- har.obs[t]/(1 - c)
+    }
+    mu.green ~ dlnorm(log(15000), 1/(0.2)^2) #prior for harvest under green policy
+    for(h in 1:H){ #H is the number of harvest years, currently 3
+      tau.sur[h] <- pow(sigma.sur[h], -2)
+      har.sur[h] ~ dnorm(mu.green, tau.sur[h]) #likelihood
+      har.obs[T+h] ~ dnorm(har.sur[h], tau.sur[h])T(0,)
+      har[T+h] <- har.obs[T+h]/(1 - c)
+    }
+    # Likelihood
+    # State process
+    P[1] ~ dunif(0, 0.5)                      # Prior for initial population size
+    P.true[1] ~ dlnorm(log(P[1]), tau.proc)
+    for (t in 1:(T+H-1)){
+    P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - har[t]/CC, 1e-5)
+    P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
+    }
+    # Observation process
+    for (t in 1:(T+H)) {
+    logN.est[t] <- log(q) + log(P.true[t]) + log(CC)
+    mu[t] <- logN.est[t] 
+    tau.obs[t] <- pow(sigma.obs[t],-2)
+    y[t] ~ dnorm(exp(mu[t]), tau.obs[t])
+    }
+    
+    # Population sizes on real scale
+    for (t in 1:(T+H)) {
+    N.est[t] <- exp(logN.est[t])
+    N.tot[t] <- N.est[t]/q
+    }
+    }
+    
