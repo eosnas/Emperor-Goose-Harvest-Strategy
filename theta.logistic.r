@@ -89,8 +89,9 @@ df <- bind_rows(Observers, Combined)
 gplot <- ggplot() + 
   geom_pointrange(data=df, aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, ymax=itotal+2*itotal.se,
                                 color=Observer), position=position_dodge(width=0.25)) + 
+  geom_hline(yintercept = 23000) + 
+  #geom_segment(aes(x=2017, xend=2021, y=23000, yend=23000)) +
   scale_color_discrete(breaks=levels(df$Observer)) +
-  #geom_segment(aes(x=2017, xend=2021, y=23000, yend=23000)) + 
   facet_wrap(~X, ncol = 1) + 
   labs(x="Year", y="Indicated Total Birds")
 print(gplot)
@@ -238,8 +239,9 @@ out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags",
 #                      n.chains = 3, n.thin = 100, n.iter = 1100000, n.burnin = 1000000, working.directory = getwd())
 plot(out)
 saveRDS(out, file = "summer_theta_logistic_2021.RDS")
-#out <- readRDS("summer_theta_logistic_2021.RDS")
+
 #plot population time series and estimate
+out <- readRDS("summer_theta_logistic_2021.RDS")
 x = rep(min(ykd$Year):max(ykd$Year), each=length(out$sims.list$CC))
 y=rep(out$sims.list$CC, times=length(ykd$Year))
 smoothScatter(cbind(x,y), nrpoints = 0, ylim=c(0,400000), ylab="Summer Total", xlab="Year", 
@@ -265,13 +267,13 @@ points(2017:2021, har.na$Harvest[33:37], pch=22, col=1, bg=1)
 segments(x0=2017, x1=2021, y0=out$mean$mu.green, col=3)
 segments(x0=2017, x1=2021, y0=out$q2.5$mu.green, col=3, lty=2)
 segments(x0=2017, x1=2021, y0=out$q97.5$mu.green, col=3, lty=2)
-arrows(x0=2017:2021, x1=2017:2021, y0=(har.na$Harvest[33:37] - (har.na$SE)[33:37]),
-       y1=(har.na$Harvest[33:37] + (har.na$SE)[33:37]), 
+arrows(x0=2017:2021, x1=2017:2021, y0=(har.na$Harvest[33:37] - 2*(har.na$SE)[33:37]),
+       y1=(har.na$Harvest[33:37] + 2*(har.na$SE)[33:37]), 
        length=0, col="darkgray")
 arrows(x0=2017:2021+0.1, x1=2017:2021+0.1, y0=out$q2.5$har[33:37], y1=out$q97.5$har[33:37], 
        length=0, col="darkgray")
-arrows(x0=har.na$Year[-c(33:37)], x1=har.na$Year[-c(33:37)], y0=(har.na$Harvest[-c(33:37)] - har.na$SE[-c(33:37)]),
-       y1=(har.na$Harvest[-c(33:37)] + har.na$SE[-c(33:37)]), 
+arrows(x0=har.na$Year[-c(33:37)], x1=har.na$Year[-c(33:37)], y0=(har.na$Harvest[-c(33:37)] - 2*har.na$SE[-c(33:37)]),
+       y1=(har.na$Harvest[-c(33:37)] + 2*har.na$SE[-c(33:37)]), 
        length=0, col="black")
 points(2017:2021+0.1, out$mean$har[33:37], pch=16, col="darkgray")
 legend("topleft", legend=c("Survey Estimate", "State-space model", "Historical harvest data", 
