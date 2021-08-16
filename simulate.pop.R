@@ -1,7 +1,9 @@
 # simulate theta-logistic to find equilibrium at posterior mean
-# Notes: (1) should population model be in terms of harvest rate? Functional response of hunters?
+# Notes: (1) should population model be in terms of harvest rate? Functional response of hunters? --> yes, see below
 #        (2) add a revised observation model to reduce process variance, 
 #           average observer effects and annual detection effects.
+# 20210916 (1) revise to do forward sims based on harvest rate. 
+#              This allows harvest to decline with population size. 
 library(ggplot2)
 #load posterior
 out <- readRDS("summer_theta_logistic_2021.RDS")
@@ -19,8 +21,9 @@ project.pop <- function(
   
   pop <- numeric(Tmax)
   pop[1] <- n1
+  h <- H/n1
   for(t in 2:Tmax){
-    pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - H/(1-c)
+    pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-c)
     pop[t] <- ifelse(pop[t]<0,0,pop[t])
   }
   if(total == FALSE) pop <- q*pop
@@ -85,14 +88,16 @@ project.pop <- function(
   pop <- numeric(Tmax)
   pop[1] <- n1
   crip <- rbeta(1, 50, 150) #mean for rbeta =0.25, beta distribution parameters, could sample from posterior
+  h <- H/n1
   for(t in 2:Tmax){
     if(stochastic == FALSE){
-      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - H
+      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)
       pop[t] <- ifelse(pop[t]<0,0,pop[t])
     }
     if(stochastic == TRUE){
       H_t <- rnorm(1, H, sdH)
-      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - H_t/(1-crip)
+      h_t <- H_t/n1
+      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h_t*pop[t-1]/(1-crip)
       pop[t] <- max(pop[t], 1e-5)
       pop[t] <- rlnorm(1, log(pop[t]), sdpop)
       
@@ -130,35 +135,41 @@ print(gplot)
 # if observed pop < 23000, then harvest = historical harvest
 # if observed pop >= 23000, then harvest as above rnorm(mu.green, sigma.har)
 project.pop <- function(
-  #population projection at constant parameters
+  #population projection at constant parameters is default
   Tmax = 100,
-  n1 = out$mean$N.tot[37], 
+  n1 = out$mean$N.tot, #need all population size estimates so we can translate to harvest rate
   r = out$mean$r.max, 
   theta = out$mean$theta,
   K = out$mean$CC, 
   Hgreen = out$mean$mu.green,
   Hred = out$mean$m.har, 
-  sdH = NA,
+  # sdH = NA,
   sdpop = NA,
   q = out$mean$q, 
   total = TRUE, 
   stochastic = TRUE){
   
   pop <- numeric(Tmax)
-  pop[1] <- n1
+  pop[1] <- n1[37] #starting population size
   crip <- rbeta(1, 50, 150) #mean for rbeta =0.25, beta distribution parameters, could sample from posterior
+  hred <- mean(Hred/n1[1:32])
+  hgreen <- mean(Hgreen/n1[33:37])
+  sdh <- sd(Hred/n1[1:32])
   s <- rchisq(1, 35) #linear model for observation error
   for(t in 2:Tmax){
     if(stochastic == FALSE){
-      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - H
+      h <- ifelse(obs < 23000, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
+      h <- ifelse(h < 0, 0, h) #check that h is not negative
+      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)
       pop[t] <- ifelse(pop[t]<0,0,pop[t])
     }
     if(stochastic == TRUE){
       mu <- q*pop[t-1]
       sigma.obs <- dnorm(0.056*mu, sqrt(((307.9^2)*35)/s) )
       obs <- rnorm(1, mu, sigma.obs) 
-      Har <- ifelse(obs < 23000, rnorm(Hred, sdH), rnorm(1, Hgreen, sdH)) 
-      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - Har/(1-crip)
+      h <- ifelse(obs < 23000, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
+      h <- ifelse(h < 0, 0, h) #check that h is not negative
+      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)
       pop[t] <- max(pop[t], 1e-5)
       pop[t] <- rlnorm(1, log(pop[t]), sdpop)
     }
@@ -167,18 +178,18 @@ project.pop <- function(
   return(pop)
 }
 
-Nsamples <- 200
+Nsamples <- 2000
 Tmax <- 100
 pick <- sample(1:length(out$sims.list$r.max), 100)
 results <- matrix(NA, 100, Nsamples)
 for(i in 1:Nsamples){
-  results[,i] <- project.pop(n1 = out$sims.list$N.tot[i,37], 
+  results[,i] <- project.pop(n1 = out$sims.list$N.tot[i,], 
                              r = out$sims.list$r.max[i], 
                              theta = out$sims.list$theta[i],
                              K = out$sims.list$CC[i], 
                              Hgreen = out$sims.list$mu.green[i],
                              Hred = out$sims.list$m.har[i],
-                             sdH = out$sims.list$sigma.har[i],
+                             #sdH = out$sims.list$sigma.har[i],
                              sdpop = out$sims.list$sigma.proc[i],
                              q = out$sims.list$q[i],
                              total = FALSE)
@@ -216,13 +227,13 @@ results <- matrix(NA, Tmax, Nsamples)
 #first 'green' season
 for(i in 1:Nsamples){
   results[,i] <- project.pop(Tmax = 2,
-                             n1 = out$sims.list$N.tot[i,37], 
+                             n1 = out$sims.list$N.tot[i,], 
                              r = out$sims.list$r.max[i], 
                              theta = out$sims.list$theta[i],
                              K = out$sims.list$CC[i], 
                              Hgreen = out$sims.list$mu.green[i],
                              Hred = out$sims.list$mu.green[i],
-                             sdH = out$sims.list$sigma.har[i],
+                             #sdH = out$sims.list$sigma.har[i],
                              sdpop = out$sims.list$sigma.proc[i],
                              q = out$sims.list$q[i],
                              total = FALSE)
@@ -232,13 +243,13 @@ df <- data.frame(Time = 1:Tmax, results)
 results <- matrix(NA, Tmax, Nsamples)
 for(i in 1:Nsamples){
   results[,i] <- project.pop(Tmax = 2,
-                             n1 = out$sims.list$N.tot[i,37], 
+                             n1 = out$sims.list$N.tot[i,], 
                              r = out$sims.list$r.max[i], 
                              theta = out$sims.list$theta[i],
                              K = out$sims.list$CC[i], 
                              Hgreen = out$sims.list$m.har[i],
                              Hred = out$sims.list$m.har[i],
-                             sdH = out$sims.list$sigma.har[i],
+                             #sdH = out$sims.list$sigma.har[i],
                              sdpop = out$sims.list$sigma.proc[i],
                              q = out$sims.list$q[i],
                              total = FALSE)
