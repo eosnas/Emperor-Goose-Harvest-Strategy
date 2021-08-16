@@ -167,7 +167,7 @@ project.pop <- function(
   return(pop)
 }
 
-Nsamples <- 200
+Nsamples <- 2000
 Tmax <- 100
 pick <- sample(1:length(out$sims.list$r.max), 100)
 results <- matrix(NA, 100, Nsamples)
