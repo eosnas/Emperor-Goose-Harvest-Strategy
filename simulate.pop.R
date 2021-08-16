@@ -208,3 +208,45 @@ gplot <- gplot +
   labs(x="Year", y="Total Birds") + 
   geom_hline(yintercept = 23000, color="red")
 print(gplot)
+
+#Simulate pop one step head with 'green' and 'red' harvest
+Nsamples <- 2000
+Tmax <- 2
+results <- matrix(NA, Tmax, Nsamples)
+#first 'green' season
+for(i in 1:Nsamples){
+  results[,i] <- project.pop(Tmax = 2,
+                             n1 = out$sims.list$N.tot[i,37], 
+                             r = out$sims.list$r.max[i], 
+                             theta = out$sims.list$theta[i],
+                             K = out$sims.list$CC[i], 
+                             Hgreen = out$sims.list$mu.green[i],
+                             Hred = out$sims.list$mu.green[i],
+                             sdH = out$sims.list$sigma.har[i],
+                             sdpop = out$sims.list$sigma.proc[i],
+                             q = out$sims.list$q[i],
+                             total = FALSE)
+}
+df <- data.frame(Time = 1:Tmax, results) 
+#second 'red' season
+results <- matrix(NA, Tmax, Nsamples)
+for(i in 1:Nsamples){
+  results[,i] <- project.pop(Tmax = 2,
+                             n1 = out$sims.list$N.tot[i,37], 
+                             r = out$sims.list$r.max[i], 
+                             theta = out$sims.list$theta[i],
+                             K = out$sims.list$CC[i], 
+                             Hgreen = out$sims.list$m.har[i],
+                             Hred = out$sims.list$m.har[i],
+                             sdH = out$sims.list$sigma.har[i],
+                             sdpop = out$sims.list$sigma.proc[i],
+                             q = out$sims.list$q[i],
+                             total = FALSE)
+}
+df2 <- data.frame(Time = 1:Tmax, results) 
+
+popRed <- mean(t(df2[2,]))
+popGreen <- mean(t(df[2,]))
+
+pCloseRed <- sum(t(df2[2,])<23000)/Nsamples
+pCloseGreen <- sum(t(df[2,])<23000)/Nsamples
