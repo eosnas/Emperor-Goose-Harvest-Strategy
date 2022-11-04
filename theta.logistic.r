@@ -1,4 +1,4 @@
-## Code by Erik Osnas, originally written May 2016, modified March 2021
+## Code by Erik Osnas, originally written May 2016, modified March 2021, November 2022
 ## Fit theta logistic model to summer survey data including years up to 2019
 ## 20160509 modified priors in response to Josh Dooley's comments
 ## 20210322 (1) converted to jagsUI, 
@@ -13,18 +13,25 @@
 ##              from 2014 - 2019 from annual reports
 ## 20210707 (1) modified model to incorporate standard error of harvest data for all years
 ##          (2) modified model to allow missing population survey data for 2020, see https://github.com/USFWS/State-Space-Prediction-2020
+## 20221104 (1) modified model and data to include 2022 data
+
 ################################
 # Data
 library(jagsUI)
-library(AKaerial)
+#library(AKaerial)
 library(tidyverse)
-ykd <- filter(YKGHistoric$combined, Species == "EMGO") %>% 
-  select(Year, itotal, itotal.se) %>%
-  bind_rows(data.frame(Year = 2021, itotal = 24300.3923, itotal.se = 1002.676216)) #input directly until AKaerial is updated
-
-harv1 <- read_csv(file="emgo_harvest_1985_2003.csv")  #harvest data sourced from YKD Goose Man. Survey, ADFG
-harv2 <- read_csv(file="emgo_harvest_export_2004_2013.csv") #harvest data downloaded from ADFG on 20210630
-harv3 <- read_csv(file="emgo_harvest_2014_2019.csv") #typed in from report tables, not available for download 
+ykd <- read_csv(file="data/YKG1985to2022Combined.csv") %>%
+  filter(Species == "EMGO") %>% 
+  select(Year, itotal, itotal.se)
+#plot
+ggplot(data=ykd) + 
+  geom_pointrange(aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, ymax=itotal+2*itotal.se)) + 
+  geom_hline(yintercept = 23000)
+################################################################################
+## Harvest data, wrangle 
+harv1 <- read_csv(file="data/emgo_harvest_1985_2003.csv")  #harvest data sourced from YKD Goose Man. Survey, ADFG
+harv2 <- read_csv(file="data/emgo_harvest_export_2004_2013.csv") #harvest data downloaded from ADFG on 20210630
+harv3 <- read_csv(file="data/emgo_harvest_2014_2019.csv") #typed in from report tables, not available for download 
 
 #reformat harv1
 harv1 <- harv1 %>% rename(RegionalHarvest = Harvest) %>%
@@ -70,15 +77,20 @@ harv3 <- harv3 %>%  rename(RegionalHarvest = Harvest) %>% #BBR and BSNS was not 
   mutate(`Spring Season` = ifelse(Year <= 2016, "Closed", "Open"))
 har <- bind_rows(harv1, harv2, harv3) %>%
   mutate(lower=Harvest-2*SE, upper=Harvest+2*SE)
-
+# above might be improved by imputation for missing data/regions
 ##plot harvest data
-p <- ggplot(har, aes(x=Year, Y=Harvest, shape=Type, color=`Spring Season`)) +
+ggplot(har, aes(x=Year, Y=Harvest, shape=Type, color=`Spring Season`)) +
   geom_pointrange(aes(x=Year, y=Harvest, ymin=lower, ymax=upper))
-print(p)
+#plot harvest and survey data together
+ggplot(data=ykd) + 
+  geom_pointrange(aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, ymax=itotal+2*itotal.se)) + 
+  geom_hline(yintercept = 23000) + 
+  geom_pointrange(data = har, aes(x=Year, y=Harvest, ymin=lower, ymax=upper, color=`Spring Season`))
+################################################################################
 #plot air survey data
 Combined <- ykd  %>%
   mutate(X="Combined", Observer = NA)
-Observers <- read_csv("YKGHistoric.expanded_1985to2021.csv") %>% #read from file until AKaerial is updated
+Observers <- read_csv("data/YKG1985to2022Expanded.csv") %>% #read from file until AKaerial is updated
   filter(Species=="EMGO") %>% 
   select(Year, strata, Observer, itotal.est, var.Ni) %>% 
   mutate(fYear = factor(Year), strata=factor(strata)) %>% 
@@ -95,12 +107,12 @@ gplot <- ggplot() +
   facet_wrap(~X, ncol = 1) + 
   labs(x="Year", y="Indicated Total Birds")
 print(gplot)
-
-#fit linear model for missing data
+################################################################################
+#fit linear model for missing data population data
 #estimate average CV of index and mse around cv expectation
 fit <- summary(lm(ykd$itotal.se~ykd$itotal-1))
-
-# Specify Model
+################################################################################
+# Specify JAGS Model
 sink("theta.logistic.emgo.jags")
 cat("
     model{
@@ -118,14 +130,14 @@ cat("
     #dunif(100000,250000) works but dlnorm(log(200000), 0.2)T(0, 400000) does not 
     sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
     tau.proc <- pow(sigma.proc, -2)
-    #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021 
-    m.har ~ dnorm(4081, 0.00001) #mean harvest before AMBCC season
+    #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
+    m.har ~ dnorm(2903, 0.00001) #mean harvest before AMBCC season; used 4081 in 2016 not sure why
     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
     for(t in 1:3){ 
       tau.sur[t] <- pow(sigma.sur[t], -2)
       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate kill to harvest
+      kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
     har[4] ~ dnorm(m.har, 1/sigma.har^2) #year 1988, latent state process harvest
     kill[4] <- har[4]/(1 - c)
@@ -133,7 +145,7 @@ cat("
       tau.sur[t] <- pow(sigma.sur[t], -2)
       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate kill to harvest
+      kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
     har[19] ~ dnorm(m.har, 1/sigma.har^2) #year 2003
     kill[19] <- har[19]/(1 - c)
@@ -141,27 +153,33 @@ cat("
       tau.sur[t] <- pow(sigma.sur[t], -2)
       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate kill to harvest
+      kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
-    for( t in 28:30){
-        har[t] ~ dnorm(m.har, 1/sigma.har^2) #years 2012, 2013, and 2014
-        kill[t] <- har[t]/(1 - c)
-    }
-    for(t in 31:T){ #T is number of data years before start of AMBCC season
+    
+    har[28] ~ dnorm(m.har, 1/sigma.har^2) #year 2012 missing,
+    kill[28] <- har[28]/(1 - c)
+    tau.sur[29] <- pow(sigma.sur[29], -2)
+    har[29] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest year 2013 in data,
+    har.sur[29] ~ dnorm(har[29], tau.sur[29]) #likelihood
+    kill[29] <- har[29]/(1 - c)
+    har[30] ~ dnorm(m.har, 1/sigma.har^2) #year 2014 missing,
+    kill[30] <- har[30]/(1 - c)
+    
+    for(t in 31:T){ #T is last data year before start of AMBCC season
       tau.sur[t] <- pow(sigma.sur[t], -2)
       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate kill to harvest
+      kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
     mu.green ~ dlnorm(log(15000), 1/(0.2)^2) #prior for harvest under green policy
-    for(h in 1:3){ #H is the number of harvest years, currently 3 are observed with harvest data, 5 total
+    for(h in 1:3){ #h is the number of harvest years with data, currently 3 are observed
       tau.sur[T+h] <- pow(sigma.sur[T+h], -2)
       har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process harvest
       har.sur[T+h] ~ dnorm(har[T+h], tau.sur[T+h]) #likelihood
-      kill[T+h] <- har[T+h]/(1 - c) #translate kill to harvest
+      kill[T+h] <- har[T+h]/(1 - c) #translate harvest to kill
     }
     for( h in 4:H){
-      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #years 2020 and 2021
+      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #years 2020 to 2022
       kill[T+h] <- har[T+h]/(1 - c)
     }
     # Likelihood
@@ -188,12 +206,13 @@ cat("
     sigma.obs.missing ~ dnorm(beta.se*exp(mu[T+4]), s/((SIGMA^2)*DF) ) #from linear model
     tau.obs[T+4] <- pow(sigma.obs.missing,-2)
     y[T+4] ~ dnorm(exp(mu[T+4]), tau.obs[T+4])
-    #year 2021 
-    logN.est[T+H] <- log(q) + log(P.true[T+H]) + log(CC)
-    mu[T+H] <- logN.est[T+H] 
-    tau.obs[T+H] <- pow(sigma.obs[T+H],-2)
-    y[T+H] ~ dnorm(exp(mu[T+H]), tau.obs[T+H])
-    
+    #year 2021 and 2022
+    for(t in 5:H){
+    logN.est[T+t] <- log(q) + log(P.true[T+t]) + log(CC)
+    mu[T+t] <- logN.est[T+t] 
+    tau.obs[T+t] <- pow(sigma.obs[T+t],-2)
+    y[T+t] ~ dnorm(exp(mu[T+t]), tau.obs[T+t])
+    }
     # Population sizes on real scale
     for (t in 1:(T+H)) {
     N.est[t] <- exp(logN.est[t])
@@ -205,16 +224,16 @@ sink()
 # Set up data list
 #need to augment harvest data with NAs for missing years
 har.na <- har %>% select(Year, Harvest, SE) %>% 
-  full_join(data.frame(Year=1985:2021)) %>% 
+  full_join(data.frame(Year=1985:2022)) %>% 
   arrange(Year)
-ykd <- ykd %>% full_join(data.frame(Year=1985:2021)) %>% 
+ykd <- ykd %>% full_join(data.frame(Year=1985:2022)) %>% 
   arrange(Year)
 jags.data <- list(y = ykd$itotal,  
                   sigma.obs = ykd$itotal.se,
                   har.sur = har.na$Harvest, 
                   sigma.sur = har.na$SE,
                   T = 32, #T is the number of years in data before start of current AMBCC season
-                  H = 5,  #H is the number of harvest years
+                  H = 6,  #H is the number of harvest years
                   DF = fit$df[2], SIGMA = fit$sigma, #linear model for missing data
                   BETA=fit$coefficients[1], SE=fit$coefficients[2])
 # Initial values
@@ -233,11 +252,13 @@ parameters <- c("r.max", "sigma.proc", "N.est", "CC", "theta", "q", "N.tot",
                 "mu.green", "har", "m.har", "sigma.har")
 # Call JAGS from R
 out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
+            n.chains = 4, n.thin = 1, n.iter = 100000, n.burnin = 10000, n.adapt=2000, 
+            parallel=TRUE)
+out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
             n.chains = 3, n.thin = 100, n.iter = 1100000, n.burnin = 1000000, n.adapt=2000, 
             parallel=TRUE)
 # out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
 #                      n.chains = 3, n.thin = 100, n.iter = 1100000, n.burnin = 1000000, working.directory = getwd())
-plot(out)
 saveRDS(out, file = "summer_theta_logistic_2021.RDS")
 
 #plot population time series and estimate
@@ -262,20 +283,20 @@ arrows(x0=ykd$Year, x1=ykd$Year, y0=ykd$itotal - 2*ykd$itotal.se,y1=ykd$itotal +
 arrows(x0=ykd$Year+0.1, x1=ykd$Year+0.1, y0=out$mean$N.est - 2*out$sd$N.est,
        y1=out$mean$N.est + 2*out$sd$N.est, length=0)
 points(ykd$Year+0.1, out$mean$N.est, pch=21, bg="gray50" )
-points(1985:2016, har.na$Harvest[-c(33:37)], pch=1, col="black")
-points(2017:2021, har.na$Harvest[33:37], pch=22, col=1, bg=1)
-segments(x0=2017, x1=2021, y0=out$mean$mu.green, col=3)
-segments(x0=2017, x1=2021, y0=out$q2.5$mu.green, col=3, lty=2)
-segments(x0=2017, x1=2021, y0=out$q97.5$mu.green, col=3, lty=2)
-arrows(x0=2017:2021, x1=2017:2021, y0=(har.na$Harvest[33:37] - 2*(har.na$SE)[33:37]),
-       y1=(har.na$Harvest[33:37] + 2*(har.na$SE)[33:37]), 
+points(1985:2016, har.na$Harvest[-c(33:38)], pch=1, col="black")
+points(2017:2022, har.na$Harvest[33:38], pch=22, col=1, bg=1)
+segments(x0=2017, x1=2022, y0=out$mean$mu.green, col=3)
+segments(x0=2017, x1=2022, y0=out$q2.5$mu.green, col=3, lty=2)
+segments(x0=2017, x1=2022, y0=out$q97.5$mu.green, col=3, lty=2)
+arrows(x0=2017:2022, x1=2017:2022, y0=(har.na$Harvest[33:38] - 2*(har.na$SE)[33:38]),
+       y1=(har.na$Harvest[33:38] + 2*(har.na$SE)[33:38]), 
        length=0, col="darkgray")
-arrows(x0=2017:2021+0.1, x1=2017:2021+0.1, y0=out$q2.5$har[33:37], y1=out$q97.5$har[33:37], 
+arrows(x0=2017:2022+0.1, x1=2017:2022+0.1, y0=out$q2.5$har[33:38], y1=out$q97.5$har[33:38], 
        length=0, col="darkgray")
-arrows(x0=har.na$Year[-c(33:37)], x1=har.na$Year[-c(33:37)], y0=(har.na$Harvest[-c(33:37)] - 2*har.na$SE[-c(33:37)]),
-       y1=(har.na$Harvest[-c(33:37)] + 2*har.na$SE[-c(33:37)]), 
+arrows(x0=har.na$Year[-c(33:38)], x1=har.na$Year[-c(33:38)], y0=(har.na$Harvest[-c(33:38)] - 2*har.na$SE[-c(33:38)]),
+       y1=(har.na$Harvest[-c(33:38)] + 2*har.na$SE[-c(33:38)]), 
        length=0, col="black")
-points(2017:2021+0.1, out$mean$har[33:37], pch=16, col="darkgray")
+points(2017:2022+0.1, out$mean$har[33:38], pch=16, col="darkgray")
 legend("topleft", legend=c("Survey Estimate", "State-space model", "Historical harvest data", 
                            "AMBCC harvest survey-C&T season"), 
        pch=c(16, 16, 1, 22), col=c(1, "gray50", 1, 1), pt.bg=c(NA, NA, NA, 1))
