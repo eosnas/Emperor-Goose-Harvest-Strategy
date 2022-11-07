@@ -14,6 +14,8 @@
 ## 20210707 (1) modified model to incorporate standard error of harvest data for all years
 ##          (2) modified model to allow missing population survey data for 2020, see https://github.com/USFWS/State-Space-Prediction-2020
 ## 20221104 (1) modified model and data to include 2022 data
+##          (2) changed mean of m.har to 2093 to reflect mean of observed harvest, used 4081 in 2016, not sure why. 
+##          (3) added different prior for mu.green with lower mean (5693) than used in 2016. It that can be commented out
 
 ################################
 # Data
@@ -171,7 +173,9 @@ cat("
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
       kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
-    mu.green ~ dlnorm(log(15000), 1/(0.2)^2) #prior for harvest under green policy
+    #mu.green ~ dlnorm(log(15000), 1/(0.2)^2) #prior for harvest under green policy
+    mu.green ~ dlnorm(log(5693), 1/(0.2)^2)  #in highsight, above prior seems way too high, what if this is lowered?
+                                             #lowered to mean of harvest in 2017 to 2019
     for(h in 1:3){ #h is the number of harvest years with data, currently 3 are observed
       tau.sur[T+h] <- pow(sigma.sur[T+h], -2)
       har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process harvest
@@ -251,7 +255,8 @@ inits <- function(){list(
 parameters <- c("r.max", "sigma.proc", "N.est", "CC", "theta", "q", "N.tot", 
                 "mu.green", "har", "m.har", "sigma.har")
 # Call JAGS from R
-out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
+#out2 is with lowered prior on mu.green
+out2 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
             n.chains = 4, n.thin = 1, n.iter = 100000, n.burnin = 10000, n.adapt=2000, 
             parallel=TRUE)
 out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
