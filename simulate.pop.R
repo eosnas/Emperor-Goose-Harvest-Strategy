@@ -4,75 +4,78 @@
 #           average observer effects and annual detection effects.
 # 20210916 (1) revise to do forward sims based on harvest rate. 
 #              This allows harvest to decline with population size. 
+# 20221116 (1) commented out dev models and worked on stochastic model
+#          (2) revised to fully sample posterior initial population size (N.tot in 2022)
+
 library(ggplot2)
 #load posterior
-out <- readRDS("summer_theta_logistic_2021.RDS")
-project.pop <- function(
-  #population projection at constant parameters
-  Tmax = 100,
-  n1 = out$mean$N.tot[37], 
-  r = out$mean$r.max, 
-  theta = out$mean$theta,
-  K = out$mean$CC, 
-  H = out$mean$mu.green,
-  q = out$mean$q,
-  c = 0.25, 
-  total = TRUE){
-  
-  pop <- numeric(Tmax)
-  pop[1] <- n1
-  h <- H/n1
-  for(t in 2:Tmax){
-    pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-c)
-    pop[t] <- ifelse(pop[t]<0,0,pop[t])
-  }
-  if(total == FALSE) pop <- q*pop
-  return(pop)
-}
-
-post2.5 <- project.pop(H = out$q2.5$mu.green)
-postmean <- project.pop()
-post97.5 <- project.pop(H = out$q97.5$mu.green)
-Tmax=100
-df <- data.frame(Time = 1:Tmax, mean=postmean, lower=post97.5, upper=post2.5)
-
-gplot <- ggplot(df) + 
-  geom_ribbon(aes(x=Time, ymin=lower, ymax=upper), fill="lightblue") +
-  geom_line(aes(x=Time, y=postmean)) + 
-  labs(x="Year", y="Total Birds")
-print(gplot)
-
-#now sample the full posterior
-Nsamples <- 200
-Tmax=100
-pick <- sample(1:length(out$sims.list$r.max), 100)
-results <- matrix(NA, Tmax, Nsamples)
-for(i in 1:Nsamples){
-  results[,i] <- project.pop(Tmax=Tmax, 
-                             n1 = out$sims.list$N.tot[i,37], 
-                             r = out$sims.list$r.max[i], 
-                             theta = out$sims.list$theta[i],
-                             K = out$sims.list$CC[i], 
-                             H = out$sims.list$mu.green[i],
-                             q = out$sims.list$q)
-}
-df <- data.frame(Time = 1:Tmax, results) 
-gplot <- ggplot(df) + 
-  geom_line(aes(x=Time, y=X1)) + 
-  labs(x="Year", y="Total Birds")
-for(i in 1:Nsamples){
-  df2 <- data.frame(Time=df$Time, Pop=df[,i])
-  gplot <- gplot + geom_line(data=df2, aes(x=Time, y=Pop))
-}
-print(gplot)
-
-#What proportion of the posterior is harvest rate > r.max?
-h <- out$sims.list$mu.green/out$sims.list$N.tot[,37]
-sum(out$sims.list$r.max - h/(1 - 0.25) < 0)/length(out$sims.list$r.max)
+out <- readRDS("out2.RDS")
+# project.pop <- function(
+#   #population projection at constant parameters
+#   Tmax = 100,
+#   n1 = out$mean$N.tot[37], 
+#   r = out$mean$r.max, 
+#   theta = out$mean$theta,
+#   K = out$mean$CC, 
+#   H = out$mean$mu.green,
+#   q = out$mean$q,
+#   c = 0.25, 
+#   total = TRUE){
+#   
+#   pop <- numeric(Tmax)
+#   pop[1] <- n1
+#   h <- H/n1
+#   for(t in 2:Tmax){
+#     pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-c)
+#     pop[t] <- ifelse(pop[t]<0,0,pop[t])
+#   }
+#   if(total == FALSE) pop <- q*pop
+#   return(pop)
+# }
+# 
+# post2.5 <- project.pop(H = out$q2.5$mu.green)
+# postmean <- project.pop()
+# post97.5 <- project.pop(H = out$q97.5$mu.green)
+# Tmax=100
+# df <- data.frame(Time = 1:Tmax, mean=postmean, lower=post97.5, upper=post2.5)
+# 
+# gplot <- ggplot(df) + 
+#   geom_ribbon(aes(x=Time, ymin=lower, ymax=upper), fill="lightblue") +
+#   geom_line(aes(x=Time, y=postmean)) + 
+#   labs(x="Year", y="Total Birds")
+# print(gplot)
+# 
+# #now sample the full posterior
+# Nsamples <- 200
+# Tmax=100
+# pick <- sample(1:length(out$sims.list$r.max), 100)
+# results <- matrix(NA, Tmax, Nsamples)
+# for(i in 1:Nsamples){
+#   results[,i] <- project.pop(Tmax=Tmax, 
+#                              n1 = out$sims.list$N.tot[i,37], 
+#                              r = out$sims.list$r.max[i], 
+#                              theta = out$sims.list$theta[i],
+#                              K = out$sims.list$CC[i], 
+#                              H = out$sims.list$mu.green[i],
+#                              q = out$sims.list$q)
+# }
+# df <- data.frame(Time = 1:Tmax, results) 
+# gplot <- ggplot(df) + 
+#   geom_line(aes(x=Time, y=X1)) + 
+#   labs(x="Year", y="Total Birds")
+# for(i in 1:Nsamples){
+#   df2 <- data.frame(Time=df$Time, Pop=df[,i])
+#   gplot <- gplot + geom_line(data=df2, aes(x=Time, y=Pop))
+# }
+# print(gplot)
+# 
+# #What proportion of the posterior is harvest rate > r.max?
+# h <- out$sims.list$mu.green/out$sims.list$N.tot[,37]
+# sum(out$sims.list$r.max - h/(1 - 0.25) < 0)/length(out$sims.list$r.max)
 
 #add stochastic population and harvest dynamics
 project.pop <- function(
-  #population projection at constant parameters
+  #population projection at constant parameters, mean is default
   Tmax = 100,
   n1 = out$mean$N.tot[37], 
   r = out$mean$r.max, 
