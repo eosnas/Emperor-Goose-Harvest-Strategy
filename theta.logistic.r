@@ -1,4 +1,4 @@
-## Code by Erik Osnas, originally written May 2016, modified March 2021, November 2022
+## Code by Erik Osnas, originally written May 2016, modified March 2021, November 2022 for NAAG conference
 ## Fit theta logistic model to summer survey data including years up to 2019
 ## 20160509 modified priors in response to Josh Dooley's comments
 ## 20210322 (1) converted to jagsUI, 
@@ -15,7 +15,10 @@
 ##          (2) modified model to allow missing population survey data for 2020, see https://github.com/USFWS/State-Space-Prediction-2020
 ## 20221104 (1) modified model and data to include 2022 data
 ##          (2) changed mean of m.har to 2093 to reflect mean of observed harvest, used 4081 in 2016, not sure why. 
-##          (3) added different prior for mu.green with lower mean (5693) than used in 2016. It that can be commented out
+##          (3) added different prior for mu.green with lower mean (5693) than used in 2016. It can be commented out.
+## 20221115 (1) changed model to accept parameter for mu.green prior so that different priors can be used, 
+##              one with original prior and one with lower mean. 
+## 20221116 (1) increased iters for convergence; need more for out2 than for out
 
 ################################
 # Data
@@ -173,9 +176,8 @@ cat("
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
       kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
-    #mu.green ~ dlnorm(log(15000), 1/(0.2)^2) #prior for harvest under green policy
-    mu.green ~ dlnorm(log(5693), 1/(0.2)^2)  #in highsight, above prior seems way too high, what if this is lowered?
-                                             #lowered to mean of harvest in 2017 to 2019
+    mu.green ~ dlnorm(pmu.mean, pmu.tau) #prior for harvest under green policy
+
     for(h in 1:3){ #h is the number of harvest years with data, currently 3 are observed
       tau.sur[T+h] <- pow(sigma.sur[T+h], -2)
       har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process harvest
@@ -236,6 +238,7 @@ jags.data <- list(y = ykd$itotal,
                   sigma.obs = ykd$itotal.se,
                   har.sur = har.na$Harvest, 
                   sigma.sur = har.na$SE,
+                  pmu.mean = log(15000), pmu.tau = 1/(0.2)^2, #original (2016) mean and se for mu.green prior
                   T = 32, #T is the number of years in data before start of current AMBCC season
                   H = 6,  #H is the number of harvest years
                   DF = fit$df[2], SIGMA = fit$sigma, #linear model for missing data
@@ -253,21 +256,26 @@ inits <- function(){list(
 )}
 # Parameters monitored
 parameters <- c("r.max", "sigma.proc", "N.est", "CC", "theta", "q", "N.tot", 
-                "mu.green", "har", "m.har", "sigma.har")
+                "mu.green", "har", "m.har", "sigma.har", "kill")
 # Call JAGS from R
-#out2 is with lowered prior on mu.green
-out2 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
-            n.chains = 4, n.thin = 1, n.iter = 100000, n.burnin = 10000, n.adapt=2000, 
-            parallel=TRUE)
+#out is with lowered prior on mu.green
 out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
-            n.chains = 3, n.thin = 100, n.iter = 1100000, n.burnin = 1000000, n.adapt=2000, 
+            n.chains = 4, n.thin = 2, n.iter = 1000000, n.burnin = 900000, n.adapt=10000,
             parallel=TRUE)
-# out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
-#                      n.chains = 3, n.thin = 100, n.iter = 1100000, n.burnin = 1000000, working.directory = getwd())
-saveRDS(out, file = "summer_theta_logistic_2021.RDS")
+## could not get convergence in 500K iters for CC and q parameters, try more
+# took 900K for convergence
+# in hindsight (in 2022), above prior seems way too high, what if this is lowered?
+jags.data2 <- jags.data
+jags.data2$pmu.mean = log(5693) #lowered to mean of harvest in 2017 to 2019
+out2 <- jags(jags.data2, inits, parameters, "theta.logistic.emgo.jags", 
+            n.chains = 4, n.thin = 2, n.iter = 1100000, n.burnin = 1000000, n.adapt=10000, 
+            parallel=TRUE)
+# needed above iters to converge
+saveRDS(out, file = "out.RDS")
+saveRDS(out2, file = "out2.RDS")
 
 #plot population time series and estimate
-out <- readRDS("summer_theta_logistic_2021.RDS")
+out <- readRDS("out.RDS")
 x = rep(min(ykd$Year):max(ykd$Year), each=length(out$sims.list$CC))
 y=rep(out$sims.list$CC, times=length(ykd$Year))
 smoothScatter(cbind(x,y), nrpoints = 0, ylim=c(0,400000), ylab="Summer Total", xlab="Year", 
