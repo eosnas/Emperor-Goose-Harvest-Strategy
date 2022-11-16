@@ -18,11 +18,7 @@
 ##          (3) added different prior for mu.green with lower mean (5693) than used in 2016. It can be commented out.
 ## 20221115 (1) changed model to accept parameter for mu.green prior so that different priors can be used, 
 ##              one with original prior and one with lower mean. 
-<<<<<<< HEAD
 ## 20221116 (1) increased iters for convergence; need more for out2 than for out
-=======
->>>>>>> eecf15da13c43c27a1b9f7ede11f3eee41fbd156
-
 ################################
 # Data
 library(jagsUI)
