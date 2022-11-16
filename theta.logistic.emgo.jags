@@ -55,9 +55,8 @@
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
       kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
-    #mu.green ~ dlnorm(log(15000), 1/(0.2)^2) #prior for harvest under green policy
-    mu.green ~ dlnorm(log(5693), 1/(0.2)^2)  #in highsight, above prior seems way too high, what if this is lowered?
-                                             #lowered to mean of harvest in 2017 to 2019
+    mu.green ~ dlnorm(pmu.mean, pmu.tau) #prior for harvest under green policy
+
     for(h in 1:3){ #h is the number of harvest years with data, currently 3 are observed
       tau.sur[T+h] <- pow(sigma.sur[T+h], -2)
       har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process harvest
