@@ -153,7 +153,7 @@ project.pop <- function(
   total = TRUE, 
   stochastic = TRUE){
   
-  pop <- har <- hunt <- rep(0, Tmax)
+  pop <- har <- hunt <- numeric() #rep(0, Tmax)
   pop[1] <- n1[37] #starting population size
   crip <- rbeta(1, 50, 150) #mean for rbeta =0.25, beta distribution parameters, could sample from posterior
   hred <- mean(Hred/n1[1:32])
@@ -176,7 +176,7 @@ project.pop <- function(
       mu <- q*pop[t-1]
       sigma.obs <- dnorm(0.056*mu, sqrt(((307.9^2)*35)/s) )
       obs <- rnorm(1, mu, sigma.obs) 
-      hunt[t] <- ifelse(obs < t_close, 0, 1)
+      hunt[t-1] <- ifelse(obs < t_close, 0, 1)
       h <- ifelse(obs < t_close, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
       h <- ifelse(h < 0, 0, h) #check that h is not negative
       pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)

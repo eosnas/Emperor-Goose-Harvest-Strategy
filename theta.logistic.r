@@ -267,11 +267,7 @@ out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags",
 jags.data2 <- jags.data
 jags.data2$pmu.mean = log(5693) #lowered to mean of harvest in 2017 to 2019
 out2 <- jags(jags.data2, inits, parameters, "theta.logistic.emgo.jags", 
-<<<<<<< HEAD
             n.chains = 4, n.thin = 2, n.iter = 1100000, n.burnin = 1000000, n.adapt=10000, 
-=======
-            n.chains = 4, n.thin = 2, n.iter = 1000000, n.burnin = 900000, n.adapt=10000, 
->>>>>>> eecf15da13c43c27a1b9f7ede11f3eee41fbd156
             parallel=TRUE)
 # needed above iters to converge
 saveRDS(out, file = "out.RDS")
