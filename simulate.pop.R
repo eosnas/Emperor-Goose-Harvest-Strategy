@@ -153,7 +153,7 @@ project.pop <- function(
   total = TRUE, 
   stochastic = TRUE){
   
-  pop <- har <- rep(NA, Tmax)
+  pop <- har <- rep(0, Tmax)
   pop[1] <- n1[37] #starting population size
   crip <- rbeta(1, 50, 150) #mean for rbeta =0.25, beta distribution parameters, could sample from posterior
   hred <- mean(Hred/n1[1:32])
@@ -182,6 +182,7 @@ project.pop <- function(
       pop[t] <- max(pop[t], 1e-5)
       pop[t] <- rlnorm(1, log(pop[t]), sdpop)
       har[t-1] <- h*pop[t-1]  #Note: har[t-1] is the harvest from t-1 to t
+      if(pop[t] < 1) break
     }
   }
   if(total == FALSE) pop <- q*pop
