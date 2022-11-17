@@ -154,7 +154,11 @@ project.pop <- function(
   stochastic = TRUE){
   
   pop <- har <- hunt <- numeric() #rep(0, Tmax)
+<<<<<<< HEAD
   pop[1] <- n1[length(n1)] #starting population size
+=======
+  pop[1] <- n1[37] #starting population size
+>>>>>>> bd6c3cd6472f65b4242c620d0003cad45d39c991
   crip <- rbeta(1, 50, 150) #mean for rbeta =0.25, beta distribution parameters, could sample from posterior
   hred <- mean(Hred/n1[1:32])
   hgreen <- mean(Hgreen/n1[33:37])

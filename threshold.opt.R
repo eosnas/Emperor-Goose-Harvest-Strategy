@@ -35,6 +35,7 @@ for(t in 1:length(t_red)){
   df$pHunt[t] <- mean(temp$phunt)
   df$mPop[t] <- mean(temp$mPop)
 }
+
 #saveRDS(df, file = "optim.RDS")
 ggplot(data = df, aes(x=Closure, y=cumHar)) + 
   geom_point()+
