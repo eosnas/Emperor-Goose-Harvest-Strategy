@@ -149,6 +149,7 @@ project.pop <- function(
   # sdH = NA,
   sdpop = NA,
   q = out$mean$q, 
+  t_close = 23000, #closure threshold, 23000 is 2016 management plan default
   total = TRUE, 
   stochastic = TRUE){
   
@@ -165,7 +166,7 @@ project.pop <- function(
       mu <- q*pop[t-1]
       sigma.obs <- dnorm(0.056*mu, sqrt(((307.9^2)*35)/s) )
       obs <- rnorm(1, mu, sigma.obs)
-      h <- ifelse(obs < 23000, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
+      h <- ifelse(obs < t_close, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
       h <- ifelse(h < 0, 0, h) #check that h is not negative
       pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)
       pop[t] <- ifelse(pop[t]<0,0,pop[t])
@@ -175,7 +176,7 @@ project.pop <- function(
       mu <- q*pop[t-1]
       sigma.obs <- dnorm(0.056*mu, sqrt(((307.9^2)*35)/s) )
       obs <- rnorm(1, mu, sigma.obs) 
-      h <- ifelse(obs < 23000, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
+      h <- ifelse(obs < t_close, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
       h <- ifelse(h < 0, 0, h) #check that h is not negative
       pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)
       pop[t] <- max(pop[t], 1e-5)
