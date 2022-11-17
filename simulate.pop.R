@@ -153,8 +153,8 @@ project.pop <- function(
   total = TRUE, 
   stochastic = TRUE){
   
-  pop <- har <- hunt <- rep(0, Tmax)
-  pop[1] <- n1[37] #starting population size
+  pop <- har <- hunt <- numeric() #rep(0, Tmax)
+  pop[1] <- n1[length(n1)] #starting population size
   crip <- rbeta(1, 50, 150) #mean for rbeta =0.25, beta distribution parameters, could sample from posterior
   hred <- mean(Hred/n1[1:32])
   hgreen <- mean(Hgreen/n1[33:37])
@@ -176,7 +176,7 @@ project.pop <- function(
       mu <- q*pop[t-1]
       sigma.obs <- dnorm(0.056*mu, sqrt(((307.9^2)*35)/s) )
       obs <- rnorm(1, mu, sigma.obs) 
-      hunt[t] <- ifelse(obs < t_close, 0, 1)
+      hunt[t-1] <- ifelse(obs < t_close, 0, 1)
       h <- ifelse(obs < t_close, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
       h <- ifelse(h < 0, 0, h) #check that h is not negative
       pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)
@@ -192,7 +192,7 @@ project.pop <- function(
 
 Nsamples <- 2000
 Tmax <- 100
-pick <- sample(1:length(out$sims.list$r.max), 100)
+pick <- sample(1:length(out$sims.list$r.max), Nsamples)
 results <- matrix(NA, 100, Nsamples)
 for(i in 1:Nsamples){
   results[,i] <- project.pop(n1 = out$sims.list$N.tot[i,], 
@@ -208,7 +208,7 @@ for(i in 1:Nsamples){
 }
 df <- data.frame(Time = 1:Tmax, results) 
 gplot <- ggplot()
-for(i in 1:100){ #show just 100 samples
+for(i in 2:2){ #show just 100 samples
   df2 <- data.frame(Time=df$Time, Pop=df[,i+1])
   gplot <- gplot + geom_line(data=df2, aes(x=Time, y=Pop))
 }
