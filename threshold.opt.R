@@ -36,7 +36,7 @@ for(t in 1:length(t_red)){
   df$mPop[t] <- mean(temp$mPop)
 }
 
-#saveRDS(df, file = "optim.RDS")
+saveRDS(df, file = "optim.RDS")
 ggplot(data = df, aes(x=Closure, y=cumHar)) + 
   geom_point()+
   geom_smooth(method="gam", se=TRUE)
@@ -46,3 +46,8 @@ ggplot(data = df, aes(x=Closure, y=pHunt)) +
 ggplot(data = df, aes(x=Closure, y=mPop)) + 
   geom_point()+
   geom_smooth(method="gam", se=TRUE)
+#find MSY closure level
+library(mgcv)
+fit <- gam(cumHar~s(Closure), data=df)
+pred <- predict(fit)
+df[which(pred == max(pred)),]
