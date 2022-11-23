@@ -20,6 +20,8 @@
 ##              one with original prior and one with lower mean. 
 ## 20221116 (1) increased iters for convergence; need more for out2 than for out
 ## 20221118 (1) added posterior for original data/model; used to see what was learned; higher harvest prior
+## 20221122 (1) original model was in terms of kill for prior of red, yellow, 
+##              and green seasons; revised these priors to be in term of harvest and used crippling prior as in Dooley.   
 ################################
 # Data
 library(jagsUI)
@@ -136,7 +138,7 @@ cat("
     sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
     tau.proc <- pow(sigma.proc, -2)
     #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
-    m.har ~ dnorm(2903, 0.00001) #mean harvest before AMBCC season; used 4081 in 2016 not sure why
+    m.har ~ dnorm(2903, 0.00001) #mean harvest before AMBCC season; parameterized as kill of 4081 in 2016
     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
     for(t in 1:3){ 
       tau.sur[t] <- pow(sigma.sur[t], -2)
@@ -193,7 +195,8 @@ cat("
     P[1] ~ dunif(0, 0.5)                      # Prior for initial population size
     P.true[1] ~ dlnorm(log(P[1]), tau.proc)
     for (t in 1:(T+H-1)){
-    P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - kill[t]/CC, 1e-5)
+    fk[t] <- (1 - exp(-0.0001*P.true[t]*CC))*kill[t]  #functional response of hunters
+    P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - fk[t]/CC, 1e-5)
     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
     }
     # Observation process
@@ -238,7 +241,7 @@ jags.data <- list(y = ykd$itotal,
                   sigma.obs = ykd$itotal.se,
                   har.sur = har.na$Harvest, 
                   sigma.sur = har.na$SE,
-                  pmu.mean = log(15000), pmu.tau = 1/(0.2)^2, #original (2016) mean and se for mu.green prior
+                  pmu.mean = log(11250), pmu.tau = 1/(0.2)^2, #original (2016) mean and se for mu.green prior
                   T = 32, #T is the number of years in data before start of current AMBCC season
                   H = 6,  #H is the number of harvest years
                   DF = fit$df[2], SIGMA = fit$sigma, #linear model for missing data
@@ -256,22 +259,22 @@ inits <- function(){list(
 )}
 # Parameters monitored
 parameters <- c("r.max", "sigma.proc", "N.est", "CC", "theta", "q", "N.tot", 
-                "mu.green", "har", "m.har", "sigma.har", "kill")
+                "mu.green", "har", "m.har", "sigma.har", "c")
 # Call JAGS from R
 #out is with original prior on mu.green
-out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
+out1 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
             n.chains = 4, n.thin = 2, n.iter = 1000000, n.burnin = 900000, n.adapt=10000,
             parallel=TRUE)
+saveRDS(out, file = "out1.RDS")
 ## could not get convergence in 500K iters for CC and q parameters, try more
 # took 900K for convergence
 # in hindsight (in 2022), above prior seems way too high, what if this is lowered?
 jags.data2 <- jags.data
 jags.data2$pmu.mean = log(5693) #lowered to mean of harvest in 2017 to 2019
 out2 <- jags(jags.data2, inits, parameters, "theta.logistic.emgo.jags", 
-            n.chains = 4, n.thin = 2, n.iter = 1100000, n.burnin = 1000000, n.adapt=10000, 
+            n.chains = 4, n.thin = 4, n.iter = 1200000, n.burnin = 1000000, n.adapt=10000, 
             parallel=TRUE)
 # needed above iters to converge
-saveRDS(out, file = "out.RDS")
 saveRDS(out2, file = "out2.RDS")
 
 # #plot population time series and estimate
@@ -336,7 +339,7 @@ cat("
     sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
     tau.proc <- pow(sigma.proc, -2)
     #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
-    m.har ~ dnorm(2903, 0.00001) #mean harvest before AMBCC season; used 4081 in 2016 not sure why
+    m.har ~ dnorm(2903, 0.00001) #mean harvest before AMBCC season; parameterized as kill of 4081 in 2016
     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
     for(t in 1:3){ 
       tau.sur[t] <- pow(sigma.sur[t], -2)
@@ -383,7 +386,8 @@ cat("
     P[1] ~ dunif(0, 0.5)                      # Prior for initial population size
     P.true[1] ~ dlnorm(log(P[1]), tau.proc)
     for (t in 1:(T-1)){
-    P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - kill[t]/CC, 1e-5)
+    fk[t] <- (1 - exp(-0.0001*P.true[t]*CC))*kill[t]  #functional response of hunters
+    P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - fk[t]/CC, 1e-5)
     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
     }
     # Observation process
@@ -415,6 +419,6 @@ jags.data0$sigma.sur <- jags.data$sigma.sur[1:32]
 # minor improvement made to model and minor data quality issue fixed in harvest and YKD count data
 #model now includes SE for harvest data
 out0 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.2016.jags", 
-            n.chains = 4, n.thin = 2, n.iter = 1000000, n.burnin = 900000, n.adapt=10000,
+            n.chains = 4, n.thin = 4, n.iter = 2400000, n.burnin = 2000000, n.adapt=10000,
             parallel=TRUE)
 saveRDS(out0, file = "out0.RDS")

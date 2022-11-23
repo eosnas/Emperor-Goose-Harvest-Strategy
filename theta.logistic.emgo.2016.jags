@@ -57,50 +57,24 @@
     }
     mu.green ~ dlnorm(pmu.mean, pmu.tau) #prior for harvest under green policy
 
-    for(h in 1:3){ #h is the number of harvest years with data, currently 3 are observed
-      tau.sur[T+h] <- pow(sigma.sur[T+h], -2)
-      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process harvest
-      har.sur[T+h] ~ dnorm(har[T+h], tau.sur[T+h]) #likelihood
-      kill[T+h] <- har[T+h]/(1 - c) #translate harvest to kill
-    }
-    for( h in 4:H){
-      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #years 2020 to 2022
-      kill[T+h] <- har[T+h]/(1 - c)
-    }
     # Likelihood
     # State process
     P[1] ~ dunif(0, 0.5)                      # Prior for initial population size
     P.true[1] ~ dlnorm(log(P[1]), tau.proc)
-    for (t in 1:(T+H-1)){
+    for (t in 1:(T-1)){
     fk[t] <- (1 - exp(-0.0001*P.true[t]*CC))*kill[t]  #functional response of hunters
     P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - fk[t]/CC, 1e-5)
     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
     }
     # Observation process
-    for (t in 1:(T+3)) {
+    for (t in 1:T) {
     logN.est[t] <- log(q) + log(P.true[t]) + log(CC)
     mu[t] <- logN.est[t] 
     tau.obs[t] <- pow(sigma.obs[t],-2)
     y[t] ~ dnorm(exp(mu[t]), tau.obs[t])
     }
-    #year 2020, missing
-    logN.est[T+4] <- log(q) + log(P.true[T+4]) + log(CC)
-    mu[T+4] <- logN.est[T+4] 
-    # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
-    beta.se ~ dnorm(BETA, 1/SE^2)           #from linear model
-    s ~ dchisq(DF) 
-    sigma.obs.missing ~ dnorm(beta.se*exp(mu[T+4]), s/((SIGMA^2)*DF) ) #from linear model
-    tau.obs[T+4] <- pow(sigma.obs.missing,-2)
-    y[T+4] ~ dnorm(exp(mu[T+4]), tau.obs[T+4])
-    #year 2021 and 2022
-    for(t in 5:H){
-    logN.est[T+t] <- log(q) + log(P.true[T+t]) + log(CC)
-    mu[T+t] <- logN.est[T+t] 
-    tau.obs[T+t] <- pow(sigma.obs[T+t],-2)
-    y[T+t] ~ dnorm(exp(mu[T+t]), tau.obs[T+t])
-    }
     # Population sizes on real scale
-    for (t in 1:(T+H)) {
+    for (t in 1:T) {
     N.est[t] <- exp(logN.est[t])
     N.tot[t] <- N.est[t]/q
     }

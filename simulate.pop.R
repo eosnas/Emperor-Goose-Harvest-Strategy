@@ -9,7 +9,7 @@
 
 library(ggplot2)
 #load posterior
-out <- readRDS("out2.RDS")
+out <- readRDS("out0.RDS")
 # project.pop <- function(
 #   #population projection at constant parameters
 #   Tmax = 100,
@@ -288,7 +288,7 @@ project.pop2 <- function(
   K = out$mean$CC, 
   Hgreen = out$mean$mu.green,
   Hred = out$mean$m.har, 
-  # sdH = NA,
+  sdH = NA,
   sdpop = NA,
   q = out$mean$q, 
   t_close = 23000, #closure threshold, 23000 is 2016 management plan default
@@ -297,12 +297,8 @@ project.pop2 <- function(
   
   crip <- rbeta(1, 50, 150) #mean for rbeta =0.25, beta distribution parameters, could sample from posterior
   
-  pop <- har <- hunt <- numeric() #rep(0, Tmax)
+  pop <- har <- hunt <- numeric(Tmax) #rep(0, Tmax)
   pop[1] <- n1[length(n1)] #starting population size
-  hred <- mean(Hred/n1[1:32])
-  if( length(n1) > 32){ hgreen <- mean(Hgreen/n1[33:length(n1)]) }
-  if( length(n1) == 32) { hgreen <- Hgreen/n1[length(n1)] }
-  sdh <- sd(Hred/n1[1:32]) #should translate to cv so that sd can increase with mean?
   s <- rchisq(1, 35) #linear model for observation error
   
   for(t in 2:(Tmax)){
@@ -310,35 +306,39 @@ project.pop2 <- function(
       mu <- q*pop[t-1]
       sigma.obs <- dnorm(0.056*mu, sqrt(((307.9^2)*35)/s) )
       obs <- rnorm(1, mu, sigma.obs)
-      h <- ifelse(obs < t_close, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
-      h <- ifelse(h < 0, 0, h) #check that h is not negative
-      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)
+      hunt[t-1] <- ifelse(obs < t_close, 0, 1)
+      #Note: har[t-1] is the harvest from t-1 to t
+      har[t-1] <- ifelse(obs < t_close, rnorm(1, Hred, sdH), rnorm(1, Hgreen, sdH))
+      har[t-1] <- ifelse(har[t-1] < 0, 0, har[t-1]) #check that harvest is not negative
+      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - har[t-1]*(1 - exp(-0.0001*pop[t-1]))/(1-crip)
       pop[t] <- ifelse(pop[t]<0,0,pop[t])
-      har[t-1] <- h*pop[t-1]
     }
     if(stochastic == TRUE){
       mu <- q*pop[t-1]
       sigma.obs <- dnorm(0.056*mu, sqrt(((307.9^2)*35)/s) )
       obs <- rnorm(1, mu, sigma.obs) 
       hunt[t-1] <- ifelse(obs < t_close, 0, 1)
-      h <- ifelse(obs < t_close, rnorm(1, hred, sdh), rnorm(1, hgreen, sdh))
-      h <- ifelse(h < 0, 0, h) #check that h is not negative
-      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - h*pop[t-1]/(1-crip)
+      #Note: har[t-1] is the harvest from t-1 to t
+      har[t-1] <- ifelse(obs < t_close, rnorm(1, Hred, sdH), rnorm(1, Hgreen, sdH))
+      har[t-1] <- ifelse(har[t-1] < 0, 0, har[t-1]) #check that harvest is not negative
+      pop[t] <- pop[t-1] + pop[t-1]*r*(1-(pop[t-1]/K)^theta) - har[t-1]*(1 - exp(-0.0001*pop[t-1]))/(1-crip)
       pop[t] <- max(pop[t], 1e-5)
       pop[t] <- rlnorm(1, log(pop[t]), sdpop)
-      har[t-1] <- h*pop[t-1]  #Note: har[t-1] is the harvest from t-1 to t
-      if(pop[t] < 1) break
+      if(pop[t] < 1){ 
+        pop[t] <- 0
+      break
+      }
     }
   }
   if(total == FALSE) pop <- q*pop
   return(list(pop = pop, har = har, hunt = hunt))
 }
 
-out <- readRDS("out0.RDS")
+#out <- readRDS("out0.RDS")
 Nsamples <- 2000
 Tmax <- 100
 pick <- sample(1:length(out$sims.list$r.max), Nsamples)
-results <- matrix(NA, 100, Nsamples)
+results <- matrix(NA, Tmax, Nsamples)
 for(i in 1:Nsamples){
   results[,i] <- project.pop2(n1 = out$sims.list$N.tot[i,], 
                              r = out$sims.list$r.max[i], 
@@ -346,7 +346,7 @@ for(i in 1:Nsamples){
                              K = out$sims.list$CC[i], 
                              Hgreen = out$sims.list$mu.green[i],
                              Hred = out$sims.list$m.har[i],
-                             #sdH = out$sims.list$sigma.har[i],
+                             sdH = out$sims.list$sigma.har[i],
                              sdpop = out$sims.list$sigma.proc[i],
                              q = out$sims.list$q[i],
                              total = FALSE)$pop
