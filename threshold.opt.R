@@ -1,6 +1,6 @@
 # function to interate through closure thresholds and find cummulative harvest and population size or utility
 #load data
-out <- readRDS("out2.RDS")
+out <- readRDS("out2.harOriginal.RDS")
 #define threshold to search across; this is observed YKD index values to search over
 t_red <- seq(0, 50000, by= 250)
 Nsamples <- 10000 #number of samples of the posterior
@@ -43,7 +43,7 @@ for(t in 1:length(t_red)){
   df$mPopSD[t] <- sd(temp$mPop)
 }
 
-saveRDS(df, file = "optim2.RDS")
+saveRDS(df, file = "optim2.harOriginal.RDS")
 # df <- readRDS("optim2.RDS")
 df$Clower <- df$cumHar - df$cumHarSD
 df$Cupper <- df$cumHar + df$cumHarSD
@@ -72,7 +72,7 @@ slice_tail(df)$cumHar/df[which(pred == max(pred)),]$cumHar
 ################################################################################
 ## Now for the 2016 posterior
 #load data
-out <- readRDS("out0.RDS")
+out <- readRDS("out0.harOriginal.RDS")
 #define threshold to search across; this is observed YKD index values to search over
 t_red <- seq(0, 50000, by= 250)
 Nsamples <- 10000 #number of samples of the posterior
@@ -115,7 +115,7 @@ for(t in 1:length(t_red)){
   df$mPopSD[t] <- sd(temp$mPop)
 }
 
-saveRDS(df, file = "optim0.RDS")
+saveRDS(df, file = "optim0.harOriginal.RDS")
 df <- readRDS("optim0.RDS")
 df$Clower <- df$cumHar - df$cumHarSD
 df$Cupper <- df$cumHar + df$cumHarSD

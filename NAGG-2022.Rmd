@@ -1,11 +1,12 @@
 ---
-title: "Using an integrated population model to guide emperor goose management under extreme uncertainty"
-author: "Erik Osnas, USFWS Migratory Bird Management, Alaska"
+title: Using an integrated population model to guide emperor goose management under
+  extreme uncertainty
+subtitle: "Erik Osnas"
+author: "USFWS Migratory Bird Management, Alaska"
 date: "December, 2022"
-output: 
-  powerpoint_presentation:  
-    logo: FWS-logo.png  
-
+output:
+  powerpoint_presentation: 
+    reference_doc: custom_template.pptx
 ---
 
 ```{r setup, include=FALSE}
@@ -20,13 +21,15 @@ options(scipen = 5)
 
 ## Outline
 
-###"You can't have the Bayesian omelet without breaking some eggs."--Leonard (Jimmie) Savage
+### "You can't have the Bayesian omelet without breaking some eggs."--Leonard (Jimmie) Savage 
+
+<br>
 
 - Brief history of emperor goose management
-- Theta-logistic integrated population model
-  - Brief overview of model structure, data, priors (breaking the eggs)
+- Theta-logistic integrated population model, data, priors (**breaking the eggs**)
   - Results after five hunting seasons (to spring 2022)
-- Using results for management decision making (the omelet)
+- Using the posterior for management decision making (**the omelet**)
+  - Risk management and Expected Utility
 
 
 ## Brief history of emperor goose management
@@ -62,73 +65,35 @@ $$\boldsymbol{Y}_t \sim Normal(q N_t, \boldsymbol{\sigma}_{obs,t})$$
 
 *in 2016 there was no harvest under a C&T season
 
-## 2016 priors
+## The Theta-logistic model: priors
 
-!['kill' rate is actually plotted, H/(1-c)](harvest_plot-1.png)
+"Breaking the eggs"
+
+!['kill' rate is actually plotted, H/(1-c)](figures/summer_2021/harvest_plot-1.png)
 
 ## 2016 Objectives: harvest
-![](H_utility-1.png) ![](P_utility-1.png)
+![](figures/summer_2021/H_utility-1.png) ![](figures/summer_2021/P_utility-1.png)
 
 ## 2016 Objectives: population size
-![](P_utility-1.png)
+![](figures/summer_2021/P_utility-1.png)
 
 ## 2016 Results
-![](plot_on_data-1.png)
+![](figures/summer_2021/plot_on_data-1.png)
 
 ## Actual harvest thresholds
-![](emgo-update-2019.PNG)  
+![](figures/summer_2021/emgo-update-2019.PNG)  
 
 ## Update: 2019 results
-![](theta-logistic-2021.png)
+![](figures/summer_2021/theta-logistic-2021.png)
 
 ## Compare results: K
-![](compare-K-posteriors.png)
+![](figures/summer_2021/compare-K-posteriors.png)
 
 ## Compare results: growth rate
-![](compare-r_max-posteriors.png)
+![](figures/summer_2021/compare-r_max-posteriors.png)
 
-## Compare results: harvest
-![](compare-harvest-prior-posterior.png)
 
-## Consequences of model updates
-- the updated posterior for a customary and tradition season harvest will favor 
-  - **lower closure thresholds**, all else equal
-  - less frequent season closure or changes
-  
-\newline
 
-- harvest posterior is only based on three data points
-  - it will change with more data
-  - only long-term averages can be estimated well
-  - still no data for "Yellow" or "conservation measures" season
 
-## Consider for revision:
 
-1.  re-derive and negotiate new decision thresholds under new harvest data
-2.  seek more input on population and harvest objectives from *all stakeholders*
-3.  evaluate and revise population model (theta-logistic)
-4.  other data sources?
-5.  other?
 
-## 2021 Predictions from simple state-space model
-![](../EMGO_predict/ssm1.NewData.png)  
-
-## Simple state-space model
-$$log(N_{t+1}) = log(N_t) + \boldsymbol{r}_t $$
-\newline
-$$\boldsymbol{r}_{t} \sim Normal(\boldsymbol{\hat r}, \boldsymbol\sigma)$$
-\newline
-$$Y_t \sim Normal( N_t, \sigma_{obs,t})$$
-
-## Theta-logistic v. Simple model for prediction
-![](compare-thelta-logistic-simple.png)
-
-## How to make predictions under missing data
-- last observed data point (2019 'management index'): 
-  - $26583 \pm 1230$ (1 SE)
-- lagging three-year average (2016 - 2019): 
-  - `r round(mean(ykd$itotal[33:35]),1)`
-- posterior mean of last state-space model population: 
-  - `r round(last(out2$mean$N.est),1)`
-- posterior of predicted 'management index': 
-  - `r round(out$mean$y.new, 1)` $\pm$ `r round(out$sd$y.new, 1)` (1 SE)

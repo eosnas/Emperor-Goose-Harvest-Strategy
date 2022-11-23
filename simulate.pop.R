@@ -9,7 +9,7 @@
 
 library(ggplot2)
 #load posterior
-out <- readRDS("out0.RDS")
+#out <- readRDS("out0.harOriginal.RDS")
 # project.pop <- function(
 #   #population projection at constant parameters
 #   Tmax = 100,
@@ -334,7 +334,7 @@ project.pop2 <- function(
   return(list(pop = pop, har = har, hunt = hunt))
 }
 
-#out <- readRDS("out0.RDS")
+out <- readRDS("out2.harOriginal.RDS")
 Nsamples <- 2000
 Tmax <- 100
 pick <- sample(1:length(out$sims.list$r.max), Nsamples)

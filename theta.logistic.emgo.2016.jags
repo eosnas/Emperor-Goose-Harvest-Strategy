@@ -15,7 +15,7 @@
     sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
     tau.proc <- pow(sigma.proc, -2)
     #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
-    m.har ~ dnorm(2903, 0.00001) #mean harvest before AMBCC season; parameterized as kill of 4081 in 2016
+    m.har ~ dnorm(4081, 0.00001) #mean harvest before AMBCC season; parameterized as kill in 2016
     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
     for(t in 1:3){ 
       tau.sur[t] <- pow(sigma.sur[t], -2)

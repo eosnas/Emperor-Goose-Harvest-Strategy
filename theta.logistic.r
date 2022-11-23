@@ -22,6 +22,9 @@
 ## 20221118 (1) added posterior for original data/model; used to see what was learned; higher harvest prior
 ## 20221122 (1) original model was in terms of kill for prior of red, yellow, 
 ##              and green seasons; revised these priors to be in term of harvest and used crippling prior as in Dooley.   
+## 20221123 (1) Added back in harvest data used in 2016 and 2021. Harvest number pre-2017 are much larger; need to resolve. 
+##              Modified prior back for mean harvest pre-2017 to 4081.
+##          (2) Used SE for har below as uncerntainty measure for original data. 
 ################################
 # Data
 library(jagsUI)
@@ -30,6 +33,7 @@ library(tidyverse)
 ykd <- read_csv(file="data/YKG1985to2022Combined.csv") %>%
   filter(Species == "EMGO") %>% 
   select(Year, itotal, itotal.se)
+harOriginal <- read_csv(file = "data/EMGO_data.csv")
 #plot
 ggplot(data=ykd) + 
   geom_pointrange(aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, ymax=itotal+2*itotal.se)) + 
@@ -138,7 +142,7 @@ cat("
     sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
     tau.proc <- pow(sigma.proc, -2)
     #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
-    m.har ~ dnorm(2903, 0.00001) #mean harvest before AMBCC season; parameterized as kill of 4081 in 2016
+    m.har ~ dnorm(4081, 0.00001) #mean harvest before AMBCC season; parameterized as kill in 2016
     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
     for(t in 1:3){ 
       tau.sur[t] <- pow(sigma.sur[t], -2)
@@ -235,6 +239,8 @@ sink()
 har.na <- har %>% select(Year, Harvest, SE) %>% 
   full_join(data.frame(Year=1985:2022)) %>% 
   arrange(Year)
+#swap out harvest data with original until I can figure this out
+har.na$Harvest[1:32] <- harOriginal$EMGO_HARV[1:32]
 ykd <- ykd %>% full_join(data.frame(Year=1985:2022)) %>% 
   arrange(Year)
 jags.data <- list(y = ykd$itotal,  
@@ -265,7 +271,7 @@ parameters <- c("r.max", "sigma.proc", "N.est", "CC", "theta", "q", "N.tot",
 out1 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
             n.chains = 4, n.thin = 2, n.iter = 1000000, n.burnin = 900000, n.adapt=10000,
             parallel=TRUE)
-saveRDS(out, file = "out1.RDS")
+saveRDS(out1, file = "out1.harOriginal.RDS")
 ## could not get convergence in 500K iters for CC and q parameters, try more
 # took 900K for convergence
 # in hindsight (in 2022), above prior seems way too high, what if this is lowered?
@@ -275,7 +281,7 @@ out2 <- jags(jags.data2, inits, parameters, "theta.logistic.emgo.jags",
             n.chains = 4, n.thin = 4, n.iter = 1200000, n.burnin = 1000000, n.adapt=10000, 
             parallel=TRUE)
 # needed above iters to converge
-saveRDS(out2, file = "out2.RDS")
+saveRDS(out2, file = "out2.harOriginal.RDS")
 
 # #plot population time series and estimate
 # out <- readRDS("out.RDS")
@@ -339,7 +345,7 @@ cat("
     sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
     tau.proc <- pow(sigma.proc, -2)
     #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
-    m.har ~ dnorm(2903, 0.00001) #mean harvest before AMBCC season; parameterized as kill of 4081 in 2016
+    m.har ~ dnorm(4081, 0.00001) #mean harvest before AMBCC season; parameterized as kill in 2016
     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
     for(t in 1:3){ 
       tau.sur[t] <- pow(sigma.sur[t], -2)
@@ -421,4 +427,4 @@ jags.data0$sigma.sur <- jags.data$sigma.sur[1:32]
 out0 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.2016.jags", 
             n.chains = 4, n.thin = 4, n.iter = 2400000, n.burnin = 2000000, n.adapt=10000,
             parallel=TRUE)
-saveRDS(out0, file = "out0.RDS")
+saveRDS(out0, file = "out0.harOriginal.RDS")
