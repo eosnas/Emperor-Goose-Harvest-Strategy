@@ -9,37 +9,46 @@ discount <- 1 #time discount rate
 df <- data.frame(Closure=t_red,
                  cumHar=rep(NA, length(t_red)),
                  pHunt=rep(NA, length(t_red)),
-                 mPop = rep(NA, length(t_red)))
+                 mPop = rep(NA, length(t_red)),
+                 cumHarSD=rep(NA, length(t_red)),
+                 pHuntSD=rep(NA, length(t_red)),
+                 mPopSD = rep(NA, length(t_red)))
 
 #set up loops
 temp <- list(cumhar = numeric(), phunt = numeric(), mPop = numeric())
 pick <- sample(1:length(out$sims.list$r.max), Nsamples)
 for(t in 1:length(t_red)){
   for(i in 1:Nsamples){
-      reward <- project.pop2(Tmax = TimeHor+1,
-                            n1 = out$sims.list$N.tot[pick[i],], 
-                            r = out$sims.list$r.max[pick[i]], 
-                            theta = out$sims.list$theta[pick[i]],
-                            K = out$sims.list$CC[pick[i]], 
-                            Hgreen = out$sims.list$mu.green[pick[i]],
-                            Hred = out$sims.list$m.har[pick[i]],
-                            sdH = out$sims.list$sigma.har[pick[i]],
-                            sdpop = out$sims.list$sigma.proc[pick[i]],
-                            q = out$sims.list$q[pick[i]],
-                            t_close = t_red[t],
-                            total = TRUE)
-      temp$cumhar[i] <- sum(reward$har, na.rm = TRUE)
-      temp$phunt[i] <- sum(reward$hunt, na.rm = TRUE)/length(reward$hunt[!is.na(reward$hunt)])
-      temp$mPop[i] <- mean(reward$pop, na.rm = TRUE)
+    reward <- project.pop2(Tmax = TimeHor+1,
+                           n1 = out$sims.list$N.tot[pick[i],], 
+                           r = out$sims.list$r.max[pick[i]], 
+                           theta = out$sims.list$theta[pick[i]],
+                           K = out$sims.list$CC[pick[i]], 
+                           Hgreen = out$sims.list$mu.green[pick[i]],
+                           Hred = out$sims.list$m.har[pick[i]],
+                           sdH = out$sims.list$sigma.har[pick[i]],
+                           sdpop = out$sims.list$sigma.proc[pick[i]],
+                           q = out$sims.list$q[pick[i]],
+                           t_close = t_red[t],
+                           total = TRUE)
+    temp$cumhar[i] <- sum(reward$har, na.rm = TRUE)
+    temp$phunt[i] <- sum(reward$hunt, na.rm = TRUE)/length(reward$hunt[!is.na(reward$hunt)])
+    temp$mPop[i] <- mean(reward$pop, na.rm = TRUE)
   }
-  df$cumHar[t] <- mean(temp$cumhar)
+  df$cumHar[t] <- mean(temp$cumhar) #Use mean as surrogate utility function for now
   df$pHunt[t] <- mean(temp$phunt)
   df$mPop[t] <- mean(temp$mPop)
+  df$cumHarSD[t] <- sd(temp$cumhar)
+  df$pHuntSD[t] <- sd(temp$phunt)
+  df$mPopSD[t] <- sd(temp$mPop)
 }
 
 saveRDS(df, file = "optim2.RDS")
 # df <- readRDS("optim2.RDS")
+df$Clower <- df$cumHar - df$cumHarSD
+df$Cupper <- df$cumHar + df$cumHarSD
 ggplot(data = df, aes(x=Closure, y=cumHar)) + 
+  geom_ribbon(aes(x=Closure, ymin=Clower, ymax = Cupper), alpha=0.2, fill = "blue") +
   geom_point()+
   geom_smooth(method="gam", se=TRUE)
 ggplot(data = df, aes(x=Closure, y=pHunt)) + 
@@ -108,7 +117,10 @@ for(t in 1:length(t_red)){
 
 saveRDS(df, file = "optim0.RDS")
 df <- readRDS("optim0.RDS")
+df$Clower <- df$cumHar - df$cumHarSD
+df$Cupper <- df$cumHar + df$cumHarSD
 ggplot(data = df, aes(x=Closure, y=cumHar)) + 
+  geom_ribbon(aes(x=Closure, ymin=Clower, ymax = Cupper), alpha=0.2, fill = "blue") +
   geom_point()+
   geom_smooth(method="gam", se=TRUE)
 ggplot(data = df, aes(x=Closure, y=pHunt)) + 
