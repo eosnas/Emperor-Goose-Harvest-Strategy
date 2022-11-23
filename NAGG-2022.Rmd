@@ -1,29 +1,35 @@
 ---
-title: "2021 update to emperor goose theta-logistic model"
-author: "Erik Osnas, USFWS MBM, Alaska"
-date: "`r Sys.Date()`"
-output: powerpoint_presentation
+title: "Using an integrated population model to guide emperor goose management under extreme uncertainty"
+author: "Erik Osnas, USFWS Migratory Bird Management, Alaska"
+date: "December, 2022"
+output: 
+  powerpoint_presentation:  
+    logo: FWS-logo.png  
+
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-library(AKaerial)
-library(dplyr)
-library(ggplot2)
-load("../EMGO_predict/.RData")
-out2 <- readRDS("summer_theta_logistic_2021.RDS")
-ykd <- filter(YKGHistoric$combined, Species == "EMGO") %>% 
-  select(Year, itotal, itotal.se)
+library(tidyverse)
+# load("../EMGO_predict/.RData")
+# out2 <- readRDS("summer_theta_logistic_2021.RDS")
+# ykd <- filter(YKGHistoric$combined, Species == "EMGO") %>% 
+#   select(Year, itotal, itotal.se)
 options(scipen = 5)
 ```
 
 ## Outline
 
-- Theta-logistic state-space model
-  - Results of update after three hunting seasons (to 2019)
-  - Consequence for management strategy revision
-- State-space model used for 2020 and 2021 predictions
-  - Discuss how to make predictions when data is missing
+###"You can't have the Bayesian omelet without breaking some eggs."--Leonard (Jimmie) Savage
+
+- Brief history of emperor goose management
+- Theta-logistic integrated population model
+  - Brief overview of model structure, data, priors (breaking the eggs)
+  - Results after five hunting seasons (to spring 2022)
+- Using results for management decision making (the omelet)
+
+
+## Brief history of emperor goose management
 
 ## The Theta-logistic model
 - In the 2016 the USFWS (Dooley et al , Osnas and Frost) used this model to understand sustainable harvest and predict optimal harvest management decision rules (closure thresholds).  
