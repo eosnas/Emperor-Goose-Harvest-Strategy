@@ -48,7 +48,7 @@ saveRDS(df, file = "optim2.harOriginal.RDS")
 df$Clower <- df$cumHar - df$cumHarSD
 df$Cupper <- df$cumHar + df$cumHarSD
 ggplot(data = df, aes(x=Closure, y=cumHar)) + 
-  geom_ribbon(aes(x=Closure, ymin=Clower, ymax = Cupper), alpha=0.2, fill = "blue") +
+  #geom_ribbon(aes(x=Closure, ymin=Clower, ymax = Cupper), alpha=0.2, fill = "blue") +
   geom_point()+
   geom_smooth(method="gam", se=TRUE)
 ggplot(data = df, aes(x=Closure, y=pHunt)) + 
@@ -68,7 +68,7 @@ pred <- predict(fit)
 df[which(pred == max(pred)),]
 #find % yield curve with min harvest
 slice_tail(df)$cumHar/df[which(pred == max(pred)),]$cumHar
-#97%!
+#94%!
 ################################################################################
 ## Now for the 2016 posterior
 #load data
@@ -116,7 +116,7 @@ for(t in 1:length(t_red)){
 }
 
 saveRDS(df, file = "optim0.harOriginal.RDS")
-df <- readRDS("optim0.RDS")
+df <- readRDS("optim0.harOriginal.RDS")
 df$Clower <- df$cumHar - df$cumHarSD
 df$Cupper <- df$cumHar + df$cumHarSD
 ggplot(data = df, aes(x=Closure, y=cumHar)) + 
@@ -133,3 +133,7 @@ ggplot(data = df, aes(x=Closure, y=mPop)) +
 ggplot(data = df, aes(x=mPop, y=cumHar)) + 
   geom_point()+
   geom_smooth(method="gam", se=TRUE)
+#find closure level
+fit <- gam(cumHar~s(Closure), data=df)
+pred <- predict(fit)
+df[which(pred == max(pred)),]

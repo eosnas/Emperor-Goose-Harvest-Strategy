@@ -26,16 +26,39 @@ options(scipen = 5)
 <br>
 
 - Brief history of emperor goose management
-- Theta-logistic integrated population model, data, priors (**breaking the eggs**)
+- Theta-logistic integrated population model 
+  - Data and priors (**breaking the eggs**)
   - Results after five hunting seasons (to spring 2022)
 - Using the posterior for management decision making (**the omelet**)
   - Risk management and Expected Utility
 
+## Emperor goose range
 
-## Brief history of emperor goose management
+![](figures/EMGO-map.png)
+
+## Brief history of emperor goose management  
+
+![Spring index](figures/Spring_index.png)
+
+## Brief history of emperor goose management 
+- bag limits reduced from 6 to 2 in 1985
+- fall season closed in 1986
+- spring season closed in 1987
+<br>
+- in 2015, population index allowed havrest
+<br>
+- in 2016, management plan revised: 
+  - new management index (YKD Coastal Zone Breeding Pair Survey)
+  - new harvest management decision thresholds
+  - fall and spring-summer seasons opened for 2017
+  
+## Brief history of emperor goose management 
+
+![](figures/2016-har-index.png) 
+
 
 ## The Theta-logistic model
-- In the 2016 the USFWS (Dooley et al , Osnas and Frost) used this model to understand sustainable harvest and predict optimal harvest management decision rules (closure thresholds).  
+- In the 2016 the USFWS (Dooley et al 2016, Osnas and Frost 2016) used this model to understand sustainable harvest and predict optimal harvest management decision rules (closure thresholds).  
 \newline
 - Actual management decision rules were determined based on negotiation between the all stakeholders (USFWS, ADFG, and Native Caucus) 
 
@@ -48,42 +71,34 @@ options(scipen = 5)
     * $\boldsymbol\Theta$, 'non-linear density-dependence'
     * these determine equilibrium population size for a given harvest level (MSY)
 
-## The Theta-logistic model: parameters
-$$N_{t+1} = N_t + N_t \boldsymbol{r} \left[1 - \left(\frac{N_t}{\boldsymbol{K}}\right)^\boldsymbol{\theta} \right] - \frac{H_t}{(1 - c)}$$
+## The Theta-logistic model
+State process
+$$E[N_{t+1}] = N_t + N_t \boldsymbol{r} \left[1 - \left(\frac{N_t}{\boldsymbol{K}}\right)^\boldsymbol{\theta} \right] - \frac{H_t}{(1 - c)}$$
 \newline
-$$N_{t+1} \sim LogNormal(log(N_{t+1}), \boldsymbol\sigma)$$
+$$N_{t+1} \sim LogNormal(log(E[N_{t+1}]), \boldsymbol\sigma_n)$$
+$$H_t \sim Normal(\bar H_s, \sigma_{h})$$
 \newline
-$$Y_t \sim Normal(\boldsymbol{q} N_t, \sigma_{obs,t})$$
+Observation process: data
+$$Y_{obs,t} \sim Normal(\boldsymbol{q} N_t, \sigma_{Yobs,t})$$
 
-## The Theta-logistic model: data
-$$N_{t+1} = N_t + N_t r \left[1 - \left(\frac{N_t}{K}\right)^\theta \right] - \frac{\boldsymbol{H}_t}{(1 - c)}$$
-\newline
-$$N_{t+1} \sim LogNormal(log(N_{t+1}), \sigma)$$
-\newline
-$$\boldsymbol{Y}_t \sim Normal(q N_t, \boldsymbol{\sigma}_{obs,t})$$
-\newline  
+$$H_{obs,t} \sim Normal(H_t, \sigma_{Hobs,t})$$
 
-*in 2016 there was no harvest under a C&T season
+## The Theta-logistic model
+Priors: "breaking the eggs" = informative priors
 
-## The Theta-logistic model: priors
+$$ \{\boldsymbol{r}, \;\boldsymbol{K}, \;\boldsymbol{\theta}, \;\boldsymbol{q}, \;\boldsymbol c, \;N_1, \;\boldsymbol\sigma_n, \;\boldsymbol{ \bar H}_s, \;\boldsymbol\sigma_h \}$$
 
-"Breaking the eggs"
+$$\boldsymbol{ \bar H}_s \sim LogNormal(a, b)$$
 
-!['kill' rate is actually plotted, H/(1-c)](figures/summer_2021/harvest_plot-1.png)
+## Results 2022
 
-## 2016 Objectives: harvest
-![](figures/summer_2021/H_utility-1.png) ![](figures/summer_2021/P_utility-1.png)
 
 ## 2016 Objectives: population size
 ![](figures/summer_2021/P_utility-1.png)
 
 ## 2016 Results
-![](figures/summer_2021/plot_on_data-1.png)
 
-## Actual harvest thresholds
-![](figures/summer_2021/emgo-update-2019.PNG)  
-
-## Update: 2019 results
+## Update: 2022 results
 ![](figures/summer_2021/theta-logistic-2021.png)
 
 ## Compare results: K

@@ -24,7 +24,7 @@
 ##              and green seasons; revised these priors to be in term of harvest and used crippling prior as in Dooley.   
 ## 20221123 (1) Added back in harvest data used in 2016 and 2021. Harvest number pre-2017 are much larger; need to resolve. 
 ##              Modified prior back for mean harvest pre-2017 to 4081.
-##          (2) Used SE for har below as uncerntainty measure for original data. 
+##          (2) Used SE for har below as uncertainty measure for original data. 
 ################################
 # Data
 library(jagsUI)
