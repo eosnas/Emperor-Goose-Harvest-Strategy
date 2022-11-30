@@ -67,7 +67,7 @@ options(scipen = 5)
 
 ## The Theta-logistic model
 State process
-$$E[N_{t+1}] = N_t + N_t \boldsymbol{r} \left[1 - \left(\frac{N_t}{\boldsymbol{K}}\right)^\boldsymbol{\theta} \right] - \frac{H_t}{(1 - c)}$$
+$$E[N_{t+1}] = N_t + N_t \boldsymbol{r} \left[1 - \left(\frac{N_t}{\boldsymbol{K}}\right)^\boldsymbol{\theta} \right] - \frac{f(H_t, N_t)}{(1 - c)}$$
 \newline
 $$N_{t+1} \sim LogNormal(log(E[N_{t+1}]), \boldsymbol\sigma_n)$$
 $$H_t \sim Normal(\bar H_s, \sigma_{h})$$

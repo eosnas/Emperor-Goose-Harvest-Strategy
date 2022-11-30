@@ -42,6 +42,7 @@ ggplot(data=ykd) +
   geom_pointrange(data = har.all, 
                   aes(x=Year, y=Harvest, ymin=lower, ymax=upper, color=`Spring Season`)) + 
   labs(x="Year", y="Number") + 
+  geom_segment(aes(x=2016.5, xend=2022, y=23000, yend=23000), color = "red", size=2)+
   theme(legend.position="top", 
         legend.text = element_text(size=20), 
         legend.title = element_text(size=20),
@@ -63,6 +64,7 @@ ggplot(data=ykd) +
   labs(x="Year", y="Number") + 
   geom_segment(aes(x=2016.5, xend=2022, y=out$mean$mu.green, yend=out$mean$mu.green), 
                color=3, size=2)+
+  geom_segment(aes(x=2016.5, xend=2022, y=23000, yend=23000), color = "red", size=2)+
   geom_polygon(data=df2, aes(x=x, y=y), fill=3, alpha=0.5)+
   geom_polygon(data=df2, aes(x=x, y=y2), fill=3, alpha=0.25)+
   theme(legend.position="top", 
