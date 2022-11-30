@@ -30,7 +30,7 @@ options(scipen = 5)
   - Data and priors (**breaking the eggs**)
   - Results after five hunting seasons (to spring 2022)
 - Using the posterior for management decision making (**the omelet**)
-  - Risk management and Expected Utility
+  - Risk management and expected utility
 
 ## Emperor goose range
 
@@ -41,35 +41,29 @@ options(scipen = 5)
 ![Spring index](figures/Spring_index.png)
 
 ## Brief history of emperor goose management 
-- bag limits reduced from 6 to 2 in 1985
+- fall bag limits reduced from 6 to 2 in 1985
 - fall season closed in 1986
 - spring season closed in 1987
 <br>
-- in 2015, population index allowed havrest
+- in 2015, population index allowed harvest
 <br>
 - in 2016, management plan revised: 
   - new management index (YKD Coastal Zone Breeding Pair Survey)
   - new harvest management decision thresholds
-  - fall and spring-summer seasons opened for 2017
-  
-## Brief history of emperor goose management 
+  - fall and spring-summer seasons opened in 2017
+
+## Brief history of emperor goose management: what we knew in 2016 
 
 ![](figures/2016-har-index.png) 
 
+## The Theta-logistic model: 2016
+- In the 2016 the USFWS (Dooley et al. 2016, Osnas and Frost 2016) used this model to estimate harvest potential and guide harvest management decision rules (closure thresholds)  
+- used to estimate population parameters ($\boldsymbol{r}_{max}$, $\boldsymbol{K}$, $\boldsymbol\Theta$) and MSY  
+- Actual management decision rules were determined based on negotiation between the all stakeholders (USFWS, ADFG, and Native Caucus)  
 
-## The Theta-logistic model
-- In the 2016 the USFWS (Dooley et al 2016, Osnas and Frost 2016) used this model to understand sustainable harvest and predict optimal harvest management decision rules (closure thresholds).  
-\newline
-- Actual management decision rules were determined based on negotiation between the all stakeholders (USFWS, ADFG, and Native Caucus) 
+## Brief history of emperor goose management
+![](figures/2016-har-index-with-closure.png) 
 
-## The Theta-logistic model
-- commonly used for harvest management  
-  * fisheries, polar bear, whales, waterfowl
-  * used to estimate population parameters
-    * growth rate ($\boldsymbol{r}_{max}$)
-    * carrying capacity (population size without harvest, $\boldsymbol{K}$)
-    * $\boldsymbol\Theta$, 'non-linear density-dependence'
-    * these determine equilibrium population size for a given harvest level (MSY)
 
 ## The Theta-logistic model
 State process
@@ -87,27 +81,104 @@ $$H_{obs,t} \sim Normal(H_t, \sigma_{Hobs,t})$$
 Priors: "breaking the eggs" = informative priors
 
 $$ \{\boldsymbol{r}, \;\boldsymbol{K}, \;\boldsymbol{\theta}, \;\boldsymbol{q}, \;\boldsymbol c, \;N_1, \;\boldsymbol\sigma_n, \;\boldsymbol{ \bar H}_s, \;\boldsymbol\sigma_h \}$$
-
+\newline
 $$\boldsymbol{ \bar H}_s \sim LogNormal(a, b)$$
+\newline
+In 2016:
+$$Open: a = log(11250), b = 0.2$$
+$$Closed: a = log(4081), b = 0.1$$  
 
-## Results 2022
+## Harvest priors
+![](figures/2016-har-priors.png)
+
+## Results 2022: What did we learn?  
+
+![](figures/2022-har-index.png)
+
+## Results 2022: What did we learn?  
+
+![](figures/postHar.1.png)
+
+## Results 2022: What did we learn?  
+
+![](figures/postHar.2.png)
+
+## Results 2022: What did we learn?  
+
+![](figures/2022-har-index-harpost1.png)
+
+## Results 2022: What did we learn?  
+
+![](figures/r_max_post.png)
+
+## Results 2022: What did we learn?  
+
+![](figures/K_post.png) 
+
+## Results 2022: What did we learn?  
+
+![](figures/theta_post.png)
+
+## Results 2022: What did we learn?  
+
+![](figures/N2022_post.png)
+
+## Using the posterior: prediction
+![](figures/population.sims.png)
 
 
-## 2016 Objectives: population size
-![](figures/summer_2021/P_utility-1.png)
+## Using the posterior
 
-## 2016 Results
+* What is the best closure threshold?  
+    *Answer: maximize expected utility = The omelet  
+  
+  $$max_a [E [ U(H,N,a) ] = \frac{1}{S}\sum_{i}^{S} \sum_{t}^{T} U(H_t,N_t, a_t |  parameters_i)$$
+  
+## Utility: population size  
 
-## Update: 2022 results
-![](figures/summer_2021/theta-logistic-2021.png)
+![](figures/utility.png)
 
-## Compare results: K
-![](figures/summer_2021/compare-K-posteriors.png)
+## Utility: population size  
 
-## Compare results: growth rate
-![](figures/summer_2021/compare-r_max-posteriors.png)
+![](figures/utility2.png)
 
+## Optimal risk-neutral management action
 
+![](figures/cum-har-v-closure.png)
+
+## Optimal risk-neutral management action
+![](figures/cum-har-v-closure-1SD.png)
+
+## Optimal risk-neutral management action
+![](figures/mPop-v-closure-1SD.png)
+
+## Conclusions
+
+* harvest is less than originally hypothesized in 2016
+* large uncertainty in yield potential due to:
+  * demographic parameters
+  * realized harvest
+  * survey data
+* use posterior to manage risk
+  * risk-neutral MSY closure is near current closure level
+
+\newline
+We are currently eliciting objectives and risk tolerance of stakeholders
+
+## Thanks
+
+* USFWS MBM staff in Alaska and HQ
+* ADFG Waterfowl and Subsistence Divisions
+* AMBCC Native Caucus members of the Emperor Goose Committee
+
+\newline
+* hunters that participated in the AMBCC harvest survey
+
+![](figures/ambcc.png)
+
+![](figures/adfg.png)
+
+![](figures/FWS-logo.png)
 
 
 

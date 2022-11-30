@@ -7,7 +7,7 @@
 # 20221116 (1) commented out dev models and worked on stochastic model
 #          (2) revised to fully sample posterior initial population size (N.tot in 2022)
 
-library(ggplot2)
+#library(ggplot2)
 #load posterior
 #out <- readRDS("out0.harOriginal.RDS")
 # project.pop <- function(
@@ -334,31 +334,31 @@ project.pop2 <- function(
   return(list(pop = pop, har = har, hunt = hunt))
 }
 
-out <- readRDS("out2.harOriginal.RDS")
-Nsamples <- 2000
-Tmax <- 100
-pick <- sample(1:length(out$sims.list$r.max), Nsamples)
-results <- matrix(NA, Tmax, Nsamples)
-for(i in 1:Nsamples){
-  results[,i] <- project.pop2(n1 = out$sims.list$N.tot[i,], 
-                             r = out$sims.list$r.max[i], 
-                             theta = out$sims.list$theta[i],
-                             K = out$sims.list$CC[i], 
-                             Hgreen = out$sims.list$mu.green[i],
-                             Hred = out$sims.list$m.har[i],
-                             sdH = out$sims.list$sigma.har[i],
-                             sdpop = out$sims.list$sigma.proc[i],
-                             q = out$sims.list$q[i],
-                             total = FALSE)$pop
-}
-df <- data.frame(Time = 1:Tmax, results) 
-gplot <- ggplot()
-for(i in 1:100){ #show just 100 samples
-  df2 <- data.frame(Time=df$Time, Pop=df[,i+1])
-  gplot <- gplot + geom_line(data=df2, aes(x=Time, y=Pop))
-}
-gplot <- gplot +
-  labs(x="Year", y="Total Birds") + 
-  geom_hline(yintercept = 23000, color="red")
-print(gplot)
+# out <- readRDS("out2.harOriginal.RDS")
+# Nsamples <- 2000
+# Tmax <- 100
+# pick <- sample(1:length(out$sims.list$r.max), Nsamples)
+# results <- matrix(NA, Tmax, Nsamples)
+# for(i in 1:Nsamples){
+#   results[,i] <- project.pop2(n1 = out$sims.list$N.tot[i,], 
+#                              r = out$sims.list$r.max[i], 
+#                              theta = out$sims.list$theta[i],
+#                              K = out$sims.list$CC[i], 
+#                              Hgreen = out$sims.list$mu.green[i],
+#                              Hred = out$sims.list$m.har[i],
+#                              sdH = out$sims.list$sigma.har[i],
+#                              sdpop = out$sims.list$sigma.proc[i],
+#                              q = out$sims.list$q[i],
+#                              total = FALSE)$pop
+# }
+# df <- data.frame(Time = 1:Tmax, results) 
+# gplot <- ggplot()
+# for(i in 1:100){ #show just 100 samples
+#   df2 <- data.frame(Time=df$Time, Pop=df[,i+1])
+#   gplot <- gplot + geom_line(data=df2, aes(x=Time, y=Pop))
+# }
+# gplot <- gplot +
+#   labs(x="Year", y="Total Birds") + 
+#   geom_hline(yintercept = 23000, color="red")
+# print(gplot)
 
