@@ -25,99 +25,56 @@
 ## 20221123 (1) Added back in harvest data used in 2016 and 2021. Harvest number pre-2017 are much larger; need to resolve. 
 ##              Modified prior back for mean harvest pre-2017 to 4081.
 ##          (2) Used SE for har below as uncertainty measure for original data. 
+## 20230525 (1) Modified model to use harvest data from Lilly (ADFG); 
+##               missing harvest data was imputed and SE increase due to imputation error. 
+##         
 ################################
 # Data
 library(jagsUI)
 #library(AKaerial)
 library(tidyverse)
-ykd <- read_csv(file="data/YKG1985to2022Combined.csv") %>%
+ykd <- AKaerial::YKGHistoric$output.table %>%
+  filter(Species == "EMGO") %>% 
+  select(Year, Observer, itotal = itotal.est, itotal.se = SE.i)
+index <- AKaerial::YKGHistoric$combined %>%
   filter(Species == "EMGO") %>% 
   select(Year, itotal, itotal.se)
-harOriginal <- read_csv(file = "data/EMGO_data.csv")
 #plot
 ggplot(data=ykd) + 
-  geom_pointrange(aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, ymax=itotal+2*itotal.se)) + 
+  geom_pointrange(aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, 
+                      ymax=itotal+2*itotal.se, col=Observer)) + 
+  geom_point(data = index, aes(x=Year, y=itotal)) + 
   geom_hline(yintercept = 23000)
 ################################################################################
 ## Harvest data, wrangle 
-harv1 <- read_csv(file="data/emgo_harvest_1985_2003.csv")  #harvest data sourced from YKD Goose Man. Survey, ADFG
-harv2 <- read_csv(file="data/emgo_harvest_export_2004_2013.csv") #harvest data downloaded from ADFG on 20210630
-harv3 <- read_csv(file="data/emgo_harvest_2014_2019.csv") #typed in from report tables, not available for download 
+har1 <- read_csv(file="data/Harvest_data_from_Liily_ADFG/Harvest_survey_data_from_Lilly.csv") %>%
+#harvest data sourced from Lilly's (ADFG) spreadsheet
+#missing region are filled in with mean, see Naves spreadsheet
+  mutate(Harvest = Spring + Summer + Fall, 
+         SE = ifelse(is.na(SE_with_imputation_error), 
+                     Harvest*CIP_reported/(1.96*100), SE_with_imputation_error), 
+         CV = SE/Harvest, 
+         Season = c(rep("Open", 2),rep("Closed", 30), rep("Open", 3)), 
+         upper = Harvest + 2*SE, lower = Harvest - 2*SE, 
+         Type = "Subsistence")
+har2 <- read_csv(file="data/EMGO_reported_permit_harvest_2017_2022_Erik Osnas.csv") %>%
+#permit harvest data from ADFG
+  mutate(Type = ifelse(Region == "508 - nonresidents", "Nonresident", "Resident")) %>%
+  group_by(Year) %>%
+  summarise(PermitHar = sum(Take)) %>%
+  mutate(Type = "Permit", Season = "Open")
 
-#reformat harv1
-harv1 <- harv1 %>% rename(RegionalHarvest = Harvest) %>%
-  group_by(Year) %>%
-  summarise(Harvest = sum(RegionalHarvest, na.rm=TRUE), SE = sqrt(sum(SE^2, na.rm = TRUE)))
-#estimate is zero in 1988 and 2003, YKD had no reported harvest, remove
-harv1 <- filter(harv1, !Year %in% c(1988, 2003:2005)) %>% #2005 is low but non-zero estimates for YKD and BB, 
-  # leave in? Josh deleted in 2015; here delete for consistency; 2004 is in data download (harv2)
-  select(Year, Harvest, SE) %>%
-  mutate(Type="Goose Management Plan", `Spring Season`=ifelse(Year<=1986, "Open", "Closed"))
-#reformat harv2
-  #some rows contain summary by region ("All Regions")--all but 2012 and 2013:
-  #appears that in 2012 the only data is for NW Arctic and St Lawrence, remove 2012; 
-  #for 2013 there is no 'All subregion' summary, need to summarize that year
-  #for Bering Strait, only 'All subregions' is given
-harv2013 <- harv2 %>% filter(Year==2013) %>%
-  filter(Year != 2012, `Sub-region` != "All subregions") %>%
-  select(Year, Region, `Sub-region`, contains("Annual")) %>%
-  rename(RegionalHarvest = "Annual Harvest", CIP = "CIP (Annual)") %>%
-  mutate(CIP = as.numeric(substr(CIP, 1, 4)), Var = (RegionalHarvest*CIP/200)^2) %>% #remove percent sign and convert to numeric
-  group_by(Year) %>%
-  summarise(Harvest = sum(RegionalHarvest, na.rm=TRUE), SE = sqrt(sum(Var, na.rm = TRUE))) %>% #CIP = 2*CV = 2*SE/mean
-  ungroup() %>% select(Year, Harvest, SE)  %>%
-  mutate(Type="ADFG 2004-2015", `Spring Season`="Closed")
- #do the rest
-harv2 <- harv2 %>% 
-  filter( !Year %in%c(2012, 2013), `Sub-region` == "All subregions") %>%
-  select(Year, Region, `Sub-region`, contains("Annual")) %>%
-  rename(RegionalHarvest = "Annual Harvest", CIP = "CIP (Annual)") %>%
-  mutate(CIP = as.numeric(substr(CIP, 1, 4)), Var = (RegionalHarvest*CIP/200)^2) %>% #remove percent sign and convert to numeric
-  group_by(Year) %>%
-  summarise(Harvest = sum(RegionalHarvest, na.rm=TRUE), SE = sqrt(sum(Var, na.rm = TRUE))) %>% #CIP = 2*CV = 2*SE/mean
-  ungroup() %>% select(Year, Harvest, SE)  %>%
-  mutate(Type="ADFG 2004-2015", `Spring Season`="Closed") %>% 
-  bind_rows(harv2013)
-#reformat harv3
-harv3 <- harv3 %>%  rename(RegionalHarvest = Harvest) %>% #BBR and BSNS was not sampled in 2015
-  mutate(Var = (RegionalHarvest*CIP/200)^2) %>%
-  group_by(Year) %>%
-  summarise(Harvest = sum(RegionalHarvest), SE = sqrt(sum(Var))) %>%
-  ungroup() %>% drop_na() %>%
-  bind_cols(data.frame(Type=c("ADFG 2004-2015",rep("5 Region Design",4)))) %>%
-  mutate(`Spring Season` = ifelse(Year <= 2016, "Closed", "Open"))
-har <- bind_rows(harv1, harv2, harv3) %>%
-  mutate(lower=Harvest-2*SE, upper=Harvest+2*SE)
-# above might be improved by imputation for missing data/regions
 ##plot harvest data
-ggplot(har, aes(x=Year, Y=Harvest, shape=Type, color=`Spring Season`)) +
-  geom_pointrange(aes(x=Year, y=Harvest, ymin=lower, ymax=upper))
+ggplot(har1, aes(x=Year, y=Harvest, color=Season, Shape = Type)) +
+  geom_pointrange(aes(x=Year, y=Harvest, ymin=lower, ymax=upper)) + 
+  geom_point(data = har2, aes(x=Year, y=PermitHar, color = Season, shape = Type))
 #plot harvest and survey data together
 ggplot(data=ykd) + 
   geom_pointrange(aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, ymax=itotal+2*itotal.se)) + 
   geom_hline(yintercept = 23000) + 
-  geom_pointrange(data = har, aes(x=Year, y=Harvest, ymin=lower, ymax=upper, color=`Spring Season`))
+  geom_pointrange(data = har1, aes(x=Year, y=Harvest, ymin=lower, ymax=upper, color=Season, shape = Type)) + 
+  geom_point(data = har2, aes(x=Year, y=PermitHar, color = Season, shape = Type))
 ################################################################################
-#plot air survey data
-Combined <- ykd  %>%
-  mutate(X="Combined", Observer = NA)
-Observers <- read_csv("data/YKG1985to2022Expanded.csv") %>% #read from file until AKaerial is updated
-  filter(Species=="EMGO") %>% 
-  select(Year, strata, Observer, itotal.est, var.Ni) %>% 
-  mutate(fYear = factor(Year), strata=factor(strata)) %>% 
-  group_by(Year, Observer) %>% summarise(itotal=sum(itotal.est), itotal.se=sqrt(sum(var.Ni))) %>%
-  mutate(X="By Observer")
-
-df <- bind_rows(Observers, Combined)
-gplot <- ggplot() + 
-  geom_pointrange(data=df, aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, ymax=itotal+2*itotal.se,
-                                color=Observer), position=position_dodge(width=0.25)) + 
-  geom_hline(yintercept = 23000) + 
-  #geom_segment(aes(x=2017, xend=2021, y=23000, yend=23000)) +
-  scale_color_discrete(breaks=levels(df$Observer)) +
-  facet_wrap(~X, ncol = 1) + 
-  labs(x="Year", y="Indicated Total Birds")
-print(gplot)
 ################################################################################
 #fit linear model for missing data population data
 #estimate average CV of index and mse around cv expectation
@@ -139,44 +96,21 @@ cat("
     #also used dunif(1,3)
     CC ~ dunif(50000, 400000) #<-- converged but gives very high CC and upper tail on N.tot
     #dunif(100000,250000) works but dlnorm(log(200000), 0.2)T(0, 400000) does not 
-    sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
+    sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process, might try a gamma
     tau.proc <- pow(sigma.proc, -2)
-    #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
-    m.har ~ dnorm(4081, 0.00001) #mean harvest before AMBCC season; parameterized as kill in 2016
+    
+    #hierarchical model of missing harvest data: 2020, 2021, 2022
+    #Do we need to take into account the relative timeing of the harvest and survey??
+    m.har ~ dnorm(3579, 0.00001) #mean harvest before AMBCC season; parameterized as kill in 2016
     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
-    for(t in 1:3){ 
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate harvest to kill
-    }
-    har[4] ~ dnorm(m.har, 1/sigma.har^2) #year 1988, latent state process harvest
-    kill[4] <- har[4]/(1 - c)
-    for(t in 5:18){ 
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate harvest to kill
-    }
-    har[19] ~ dnorm(m.har, 1/sigma.har^2) #year 2003
-    kill[19] <- har[19]/(1 - c)
-    for(t in 20:27){ 
-      tau.sur[t] <- pow(sigma.sur[t], -2)
+    for(t in 1:19){ #missing SE for harvest, assume mean CV of 2004:2016
+      tau.sur[t] <- pow(har.sur[t]*mean.h.cv, -2)
       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
       kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
     
-    har[28] ~ dnorm(m.har, 1/sigma.har^2) #year 2012 missing,
-    kill[28] <- har[28]/(1 - c)
-    tau.sur[29] <- pow(sigma.sur[29], -2)
-    har[29] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest year 2013 in data,
-    har.sur[29] ~ dnorm(har[29], tau.sur[29]) #likelihood
-    kill[29] <- har[29]/(1 - c)
-    har[30] ~ dnorm(m.har, 1/sigma.har^2) #year 2014 missing,
-    kill[30] <- har[30]/(1 - c)
-    
-    for(t in 31:T){ #T is last data year before start of AMBCC season
+    for(t in 20:T){ #T is last data year before start of AMBCC season
       tau.sur[t] <- pow(sigma.sur[t], -2)
       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
@@ -191,7 +125,7 @@ cat("
       kill[T+h] <- har[T+h]/(1 - c) #translate harvest to kill
     }
     for( h in 4:H){
-      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #years 2020 to 2022
+      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #years 2020 to present
       kill[T+h] <- har[T+h]/(1 - c)
     }
     # Likelihood
@@ -236,6 +170,7 @@ cat("
 sink()
 # Set up data list
 #need to augment harvest data with NAs for missing years
+mean.h.cv <- mean(har1$SE[20:32]/har1$Harvest[20:32])
 har.na <- har %>% select(Year, Harvest, SE) %>% 
   full_join(data.frame(Year=1985:2022)) %>% 
   arrange(Year)
