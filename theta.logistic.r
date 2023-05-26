@@ -27,7 +27,7 @@
 ##          (2) Used SE for har below as uncertainty measure for original data. 
 ## 20230525 (1) Modified model to use harvest data from Lilly (ADFG); 
 ##               missing harvest data was imputed and SE increase due to imputation error. 
-##         
+##          (2) Modified model to use observer specific estimates. 
 ################################
 # Data
 library(jagsUI)
@@ -141,8 +141,10 @@ cat("
     for (t in 1:(T+3)) {
     logN.est[t] <- log(q) + log(P.true[t]) + log(CC)
     mu[t] <- logN.est[t] 
-    tau.obs[t] <- pow(sigma.obs[t],-2)
-    y[t] ~ dnorm(exp(mu[t]), tau.obs[t])
+    for(i in 1:2) {
+      tau.obs[t,i] <- pow(sigma.obs[t,i],-2)
+      y[t,i] ~ dnorm(exp(mu[t]), tau.obs[t,i])
+    }
     }
     #year 2020, missing
     logN.est[T+4] <- log(q) + log(P.true[T+4]) + log(CC)
@@ -151,14 +153,17 @@ cat("
     beta.se ~ dnorm(BETA, 1/SE^2)           #from linear model
     s ~ dchisq(DF) 
     sigma.obs.missing ~ dnorm(beta.se*exp(mu[T+4]), s/((SIGMA^2)*DF) ) #from linear model
-    tau.obs[T+4] <- pow(sigma.obs.missing,-2)
-    y[T+4] ~ dnorm(exp(mu[T+4]), tau.obs[T+4])
+    for(i in 1:2){
+    tau.obs[T+4,i] <- pow(sigma.obs.missing,-2)
+    y[T+4,i] ~ dnorm(exp(mu[T+4]), tau.obs[T+4,i])
     #year 2021 and 2022
     for(t in 5:H){
     logN.est[T+t] <- log(q) + log(P.true[T+t]) + log(CC)
     mu[T+t] <- logN.est[T+t] 
-    tau.obs[T+t] <- pow(sigma.obs[T+t],-2)
-    y[T+t] ~ dnorm(exp(mu[T+t]), tau.obs[T+t])
+    for(i in 1:2){
+    tau.obs[T+t,i] <- pow(sigma.obs[T+t,i],-2)
+    y[T+t,i] ~ dnorm(exp(mu[T+t]), tau.obs[T+t,i])
+    }
     }
     # Population sizes on real scale
     for (t in 1:(T+H)) {
