@@ -28,6 +28,7 @@
 ## 20230525 (1) Modified model to use harvest data from Lilly (ADFG); 
 ##               missing harvest data was imputed and SE increase due to imputation error. 
 ##          (2) Modified model to use observer specific estimates. 
+## 20230526 (1) Added permit harvest to model
 ################################
 # Data
 library(jagsUI)
@@ -49,10 +50,11 @@ ggplot(data=ykd) +
 ## Harvest data, wrangle 
 har1 <- read_csv(file="data/Harvest_data_from_Liily_ADFG/Harvest_survey_data_from_Lilly.csv") %>%
 #harvest data sourced from Lilly's (ADFG) spreadsheet
-#missing region are filled in with mean, see Naves spreadsheet
+#missing regions are filled in with mean, see Naves spreadsheet
   mutate(Harvest = Spring + Summer + Fall, 
-         SE = ifelse(is.na(SE_with_imputation_error), 
-                     Harvest*CIP_reported/(1.96*100), SE_with_imputation_error), 
+         SE = ifelse(Year > 2016,  Harvest*CIP_reported/(1.96*100), 
+                     ifelse(is.na(CIP_reported), mean(SE_with_imputation_error, na.rm = TRUE), 
+                            SE_with_imputation_error)),
          CV = SE/Harvest, 
          Season = c(rep("Open", 2),rep("Closed", 30), rep("Open", 3)), 
          upper = Harvest + 2*SE, lower = Harvest - 2*SE, 
@@ -117,16 +119,21 @@ cat("
       kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
     mu.green ~ dlnorm(pmu.mean, pmu.tau) #prior for harvest under green policy
-
-    for(h in 1:3){ #h is the number of harvest years with data, currently 3 are observed
+    m.har.p ~ dnorm(150, 1/50^2)         #priors for permit harvest
+    sd.har.p ~ dunif(0.01, 100)
+    tau.har.p <- pow(sd.har.p, -2)
+    for(h in 1:3){ #h is the number of harvest years with data, 
+                   #currently 3 are observed for subsistence; 6 for permits
       tau.sur[T+h] <- pow(sigma.sur[T+h], -2)
-      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process harvest
+      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process for harvest
       har.sur[T+h] ~ dnorm(har[T+h], tau.sur[T+h]) #likelihood
-      kill[T+h] <- har[T+h]/(1 - c) #translate harvest to kill
+      har.p[T+h] ~ dnorm(m.har.p, tau.har.p)
+      kill[T+h] <- (har[T+h] + har.p[T+h])/(1 - c) #translate harvest to kill
     }
     for( h in 4:H){
       har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #years 2020 to present
-      kill[T+h] <- har[T+h]/(1 - c)
+      har.p[T+h] ~ dnorm(m.har.p, tau.har.p)
+      kill[T+h] <- (har[T+h] + har.p[T+h])/(1 - c)
     }
     # Likelihood
     # State process
@@ -141,10 +148,8 @@ cat("
     for (t in 1:(T+3)) {
     logN.est[t] <- log(q) + log(P.true[t]) + log(CC)
     mu[t] <- logN.est[t] 
-    for(i in 1:2) {
-      tau.obs[t,i] <- pow(sigma.obs[t,i],-2)
-      y[t,i] ~ dnorm(exp(mu[t]), tau.obs[t,i])
-    }
+    tau.obs[t,i] <- pow(sigma.obs[t,i],-2)  ##stopped here, how to specific this by observer?
+    y[t,i] ~ dnorm(exp(mu[t]), tau.obs[t,i])
     }
     #year 2020, missing
     logN.est[T+4] <- log(q) + log(P.true[T+4]) + log(CC)
