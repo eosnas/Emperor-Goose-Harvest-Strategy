@@ -29,6 +29,7 @@
 ##               missing harvest data was imputed and SE increase due to imputation error. 
 ##          (2) Modified model to use observer specific estimates. 
 ## 20230526 (1) Added permit harvest to model
+## 20230530 (1) Modified model to use observer specific estimates. Finished observation model. 
 ################################
 # Data
 library(jagsUI)
@@ -75,11 +76,14 @@ ggplot(data=ykd) +
   geom_pointrange(aes(x=Year, y=itotal, ymin=itotal-2*itotal.se, ymax=itotal+2*itotal.se)) + 
   geom_hline(yintercept = 23000) + 
   geom_pointrange(data = har1, aes(x=Year, y=Harvest, ymin=lower, ymax=upper, color=Season, shape = Type)) + 
-  geom_point(data = har2, aes(x=Year, y=PermitHar, color = Season, shape = Type))
+  geom_point(data = har2, aes(x=Year, y=PermitHar, color = Season, shape = Type)) + 
+  labs(y = "Indicated Total Birds/Harvest")
 ################################################################################
 ################################################################################
 #fit linear model for missing data population data
 #estimate average CV of index and mse around cv expectation
+ggplot(data = ykd, aes(x=itotal, y=itotal.se)) + geom_point() + 
+  geom_smooth(method = "lm")
 fit <- summary(lm(ykd$itotal.se~ykd$itotal-1))
 ################################################################################
 # Specify JAGS Model
@@ -145,31 +149,25 @@ cat("
     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
     }
     # Observation process
-    for (t in 1:(T+3)) {
-    logN.est[t] <- log(q) + log(P.true[t]) + log(CC)
-    mu[t] <- logN.est[t] 
-    tau.obs[t,i] <- pow(sigma.obs[t,i],-2)  ##stopped here, how to specific this by observer?
-    y[t,i] ~ dnorm(exp(mu[t]), tau.obs[t,i])
+    for (i in 1:Num) {
+      logN.est[i] <- log(q) + log(P.true[ Year[i] ]) + log(CC)
+      mu[i] <- logN.est[i] + alpha1[Obs[i]]
+      tau.obs[i] <- pow(sigma.obs[i],-2)
+      y[i] ~ dnorm(exp(mu[i]), tau.obs[i])
     }
+   
     #year 2020, missing
     logN.est[T+4] <- log(q) + log(P.true[T+4]) + log(CC)
-    mu[T+4] <- logN.est[T+4] 
     # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
     beta.se ~ dnorm(BETA, 1/SE^2)           #from linear model
     s ~ dchisq(DF) 
+    for(i in c(5, 10)){ #Add observer effects, Heather (#5) and Michael (#10)
+    mu[T+4] <- logN.est[T+4] + alpha1[Obs[i]]
     sigma.obs.missing ~ dnorm(beta.se*exp(mu[T+4]), s/((SIGMA^2)*DF) ) #from linear model
-    for(i in 1:2){
     tau.obs[T+4,i] <- pow(sigma.obs.missing,-2)
     y[T+4,i] ~ dnorm(exp(mu[T+4]), tau.obs[T+4,i])
-    #year 2021 and 2022
-    for(t in 5:H){
-    logN.est[T+t] <- log(q) + log(P.true[T+t]) + log(CC)
-    mu[T+t] <- logN.est[T+t] 
-    for(i in 1:2){
-    tau.obs[T+t,i] <- pow(sigma.obs[T+t,i],-2)
-    y[T+t,i] ~ dnorm(exp(mu[T+t]), tau.obs[T+t,i])
     }
-    }
+    
     # Population sizes on real scale
     for (t in 1:(T+H)) {
     N.est[t] <- exp(logN.est[t])
