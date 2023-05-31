@@ -1,8 +1,8 @@
 
     model{
     # Priors and constraints
-    q ~ dunif(0.01, 1) #harvest/population adjustment factor, #dunif(0.01, 1) worked
-    #dbeta(1, 5) or dunif(0, 1) or dbeta(2, 5)--did not converge in 1mil.   
+    q ~ dbeta(2, 5) #dunif(0.01, 1) #harvest/population adjustment factor, 
+    #dunif(0.01, 1) also converged 
     c ~ dbeta(50, 150)    # c <- 0.25 for constant, distribution approx. from Dooley
     r.max ~  dlnorm(log(0.09), 0.3)T(0, 0.2) #Prior for r max, approximated from Dooley report & 
     #  pers. comm. on 5/9/16; allows some very high values to r.max > 0.3, try truncation;
@@ -12,7 +12,7 @@
     #also used dunif(1,3)
     CC ~ dunif(50000, 400000) #<-- converged but gives very high CC and upper tail on N.tot
     #dunif(100000,250000) works but dlnorm(log(200000), 0.2)T(0, 400000) does not 
-    sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process, might try a gamma
+    sigma.proc ~ dunif(0, 0.3)  # Prior for sd of state process, might try a gamma
     tau.proc <- pow(sigma.proc, -2)
     
     #hierarchical model of missing harvest data: 2020, 2021, 2022
@@ -58,27 +58,36 @@
     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
     }
     # Observation process
-    sd.obs ~ dunif(0.001, 1)
+    sd.obs ~ dunif(0.001, 10000)
     for(i in 1:NObs){
       alpha1[i] ~ dnorm(0, 1/sd.obs^2)
     }
+    VIF ~ dgamma(1, 1)  #prior for variance inflation factor
+    sd.esp ~ dgamma(1, 0.0001)  #prior for excess heterogeneity
+    tau.esp <- pow(sd.esp, -2)
     for (i in 1:(Num - 2)) {
+      esp[i] ~ dnorm(0, tau.esp)
       logN.est[i] <- log(q) + log(P.true[ Year[i] ]) + log(CC)
-      mu[i] <- logN.est[i] + alpha1[Obs[i]]
+      mu[i] <- exp(logN.est[i]) + alpha1[Obs[i]]
+      #mu[i] <- exp(logN.est[i]) + alpha1[Obs[i]] + esp[i]
       tau.obs[i] <- pow(sigma.obs[i],-2)
-      y[i] ~ dnorm(exp(mu[i]), tau.obs[i]) #likelihood
+      y[i] ~ dnorm(mu[i], tau.obs[i]/VIF) #likelihood
+      #y[i] ~ dnorm(mu[i], tau.obs[i]) #likelihood
     }
    
     #year 2020, missing
     for(i in (Num-1):Num){ #Add observer effects
+    esp[i] ~ dnorm(0, tau.esp)
     logN.est[i] <- log(q) + log(P.true[ Year[i] ]) + log(CC)
     mu[i] <- logN.est[Year[i]] + alpha1[Obs[i]]
+    #mu[i] <- logN.est[Year[i]] + alpha1[Obs[i]] + esp[i]
     # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
     beta.se[i] ~ dnorm(BETA, 1/SE^2)           #from linear model
     s[i] ~ dchisq(DF) 
     sigma.obs.missing[i] ~ dnorm(beta.se[i]*exp(mu[i]), s[i]/((SIGMA^2)*DF) ) #from linear model
     tau.obs[i] <- pow(sigma.obs.missing[i],-2)
-    y[i] ~ dnorm(exp(mu[i]), tau.obs[i])
+    y[i] ~ dnorm(mu[i], tau.obs[i]/VIF)
+    #y[i] ~ dnorm(mu[i], tau.obs[i])
     }
     
     # Population sizes on real scale

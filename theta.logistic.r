@@ -32,6 +32,9 @@
 ## 20230530 (1) Modified model to use observer specific estimates. Finished observation model. 
 ##          (2) Finished harvest model
 ##          (3) Debugged JAGS compile errors. 
+## 20230531 (1) experimented with priors; modified figure code to plot results
+##          (2) explored the effect of a variance inflation factor in likelihood (VIF);
+##              explored heterogeneity term in mu[i]
 ################################
 # Data
 library(jagsUI)
@@ -99,8 +102,8 @@ sink("theta.logistic.emgo.jags")
 cat("
     model{
     # Priors and constraints
-    q ~ dunif(0.01, 1) #harvest/population adjustment factor, #dunif(0.01, 1) worked
-    #dbeta(1, 5) or dunif(0, 1) or dbeta(2, 5)--did not converge in 1mil.   
+    q ~ dbeta(2, 5) #dunif(0.01, 1) #harvest/population adjustment factor, 
+    #dunif(0.01, 1) also converged 
     c ~ dbeta(50, 150)    # c <- 0.25 for constant, distribution approx. from Dooley
     r.max ~  dlnorm(log(0.09), 0.3)T(0, 0.2) #Prior for r max, approximated from Dooley report & 
     #  pers. comm. on 5/9/16; allows some very high values to r.max > 0.3, try truncation;
@@ -110,7 +113,7 @@ cat("
     #also used dunif(1,3)
     CC ~ dunif(50000, 400000) #<-- converged but gives very high CC and upper tail on N.tot
     #dunif(100000,250000) works but dlnorm(log(200000), 0.2)T(0, 400000) does not 
-    sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process, might try a gamma
+    sigma.proc ~ dunif(0, 0.3)  # Prior for sd of state process, might try a gamma
     tau.proc <- pow(sigma.proc, -2)
     
     #hierarchical model of missing harvest data: 2020, 2021, 2022
@@ -156,27 +159,36 @@ cat("
     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
     }
     # Observation process
-    sd.obs ~ dunif(0.001, 1)
+    sd.obs ~ dunif(0.001, 10000)
     for(i in 1:NObs){
       alpha1[i] ~ dnorm(0, 1/sd.obs^2)
     }
+    VIF ~ dgamma(1, 1)  #prior for variance inflation factor
+    sd.esp ~ dgamma(1, 0.0001)  #prior for excess heterogeneity
+    tau.esp <- pow(sd.esp, -2)
     for (i in 1:(Num - 2)) {
+      esp[i] ~ dnorm(0, tau.esp)
       logN.est[i] <- log(q) + log(P.true[ Year[i] ]) + log(CC)
-      mu[i] <- logN.est[i] + alpha1[Obs[i]]
+      mu[i] <- exp(logN.est[i]) + alpha1[Obs[i]]
+      #mu[i] <- exp(logN.est[i]) + alpha1[Obs[i]] + esp[i]
       tau.obs[i] <- pow(sigma.obs[i],-2)
-      y[i] ~ dnorm(exp(mu[i]), tau.obs[i]) #likelihood
+      y[i] ~ dnorm(mu[i], tau.obs[i]/VIF) #likelihood
+      #y[i] ~ dnorm(mu[i], tau.obs[i]) #likelihood
     }
    
     #year 2020, missing
     for(i in (Num-1):Num){ #Add observer effects
+    esp[i] ~ dnorm(0, tau.esp)
     logN.est[i] <- log(q) + log(P.true[ Year[i] ]) + log(CC)
     mu[i] <- logN.est[Year[i]] + alpha1[Obs[i]]
+    #mu[i] <- logN.est[Year[i]] + alpha1[Obs[i]] + esp[i]
     # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
     beta.se[i] ~ dnorm(BETA, 1/SE^2)           #from linear model
     s[i] ~ dchisq(DF) 
     sigma.obs.missing[i] ~ dnorm(beta.se[i]*exp(mu[i]), s[i]/((SIGMA^2)*DF) ) #from linear model
     tau.obs[i] <- pow(sigma.obs.missing[i],-2)
-    y[i] ~ dnorm(exp(mu[i]), tau.obs[i])
+    y[i] ~ dnorm(mu[i], tau.obs[i]/VIF)
+    #y[i] ~ dnorm(mu[i], tau.obs[i])
     }
     
     # Population sizes on real scale
@@ -217,11 +229,12 @@ inits <- function(){list(
 )}
 # Parameters monitored
 parameters <- c("r.max", "sigma.proc", "N.est", "CC", "theta", "q", "N.tot", 
-                "mu.green", "har", "m.har", "sigma.har", "c", "sd.obs")
+                "mu.green", "har", "m.har", "sigma.har", "c", "sd.obs", "alpha1", 
+                "VIF", "sd.esp")
 # Call JAGS from R
 #out is with original prior on mu.green
 out1 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
-            n.chains = 4, n.thin = 2, n.iter = 11000, n.burnin = 900, n.adapt=100,
+            n.chains = 4, n.thin = 2, n.iter = 110000, n.burnin = 9000, n.adapt=1000,
             parallel=TRUE)
 saveRDS(out1, file = "out1.harOriginal.RDS")
 ## could not get convergence in 500K iters for CC and q parameters, try more
@@ -250,133 +263,134 @@ saveRDS(out2, file = "out2.harOriginal.RDS")
 # points(ykd$Year, ci[2,], pch=22, bg=1)
 # 
 # 
-# plot(ykd$Year, ykd$itotal, pch=16, ylim=c(0, 50000),  ylab="YKD indicated breeding total birds", 
-#      xlab="Year", main="Emperor goose population, harvest, and state-space model")
-# arrows(x0=ykd$Year, x1=ykd$Year, y0=ykd$itotal - 2*ykd$itotal.se,y1=ykd$itotal + 2*ykd$itotal.se, 
-#        length=0)
-# arrows(x0=ykd$Year+0.1, x1=ykd$Year+0.1, y0=out$mean$N.est - 2*out$sd$N.est,
-#        y1=out$mean$N.est + 2*out$sd$N.est, length=0)
-# points(ykd$Year+0.1, out$mean$N.est, pch=21, bg="gray50" )
-# points(1985:2016, har.na$Harvest[-c(33:38)], pch=1, col="black")
-# points(2017:2022, har.na$Harvest[33:38], pch=22, col=1, bg=1)
-# segments(x0=2017, x1=2022, y0=out$mean$mu.green, col=3)
-# segments(x0=2017, x1=2022, y0=out$q2.5$mu.green, col=3, lty=2)
-# segments(x0=2017, x1=2022, y0=out$q97.5$mu.green, col=3, lty=2)
-# arrows(x0=2017:2022, x1=2017:2022, y0=(har.na$Harvest[33:38] - 2*(har.na$SE)[33:38]),
-#        y1=(har.na$Harvest[33:38] + 2*(har.na$SE)[33:38]), 
-#        length=0, col="darkgray")
-# arrows(x0=2017:2022+0.1, x1=2017:2022+0.1, y0=out$q2.5$har[33:38], y1=out$q97.5$har[33:38], 
-#        length=0, col="darkgray")
-# arrows(x0=har.na$Year[-c(33:38)], x1=har.na$Year[-c(33:38)], y0=(har.na$Harvest[-c(33:38)] - 2*har.na$SE[-c(33:38)]),
-#        y1=(har.na$Harvest[-c(33:38)] + 2*har.na$SE[-c(33:38)]), 
-#        length=0, col="black")
-# points(2017:2022+0.1, out$mean$har[33:38], pch=16, col="darkgray")
-# legend("topleft", legend=c("Survey Estimate", "State-space model", "Historical harvest data", 
-#                            "AMBCC harvest survey-C&T season"), 
-#        pch=c(16, 16, 1, 22), col=c(1, "gray50", 1, 1), pt.bg=c(NA, NA, NA, 1))
+out <- out1
+plot(ykd$Year, ykd$itotal, pch=16, ylim=c(0, 50000),  ylab="YKD indicated breeding total birds",
+     xlab="Year", main="Emperor goose population, harvest, and state-space model")
+arrows(x0=ykd$Year, x1=ykd$Year, y0=ykd$itotal - 2*ykd$itotal.se,y1=ykd$itotal + 2*ykd$itotal.se,
+       length=0)
+arrows(x0=1985:2022+0.1, x1=1985:2022+0.1, y0=out$mean$N.est - 2*out$sd$N.est,
+       y1=out$mean$N.est + 2*out$sd$N.est, length=0)
+points(1985:2022+0.1, out$mean$N.est, pch=21, bg="gray50" )
+points(1985:2016, har1$Harvest[-c(33:35)], pch=1, col="black")
+points(2017:2022, har1$Harvest[33:38], pch=22, col=1, bg=1)
+segments(x0=2017, x1=2022, y0=out$mean$mu.green, col=3)
+segments(x0=2017, x1=2022, y0=out$q2.5$mu.green, col=3, lty=2)
+segments(x0=2017, x1=2022, y0=out$q97.5$mu.green, col=3, lty=2)
+arrows(x0=2017:2022, x1=2017:2022, y0=(har1$Harvest[33:38] - 2*(har1$SE)[33:38]),
+       y1=(har1$Harvest[33:38] + 2*(har1$SE)[33:38]),
+       length=0, col="darkgray")
+arrows(x0=2017:2022+0.1, x1=2017:2022+0.1, y0=out$q2.5$har[33:38], y1=out$q97.5$har[33:38],
+       length=0, col="darkgray")
+arrows(x0=har1$Year[-c(33:38)], x1=har1$Year[-c(33:38)], y0=(har1$Harvest[-c(33:38)] - 2*har1$SE[-c(33:38)]),
+       y1=(har1$Harvest[-c(33:38)] + 2*har1$SE[-c(33:38)]),
+       length=0, col="black")
+points(2017:2022+0.1, out$mean$har[33:38], pch=16, col="darkgray")
+legend("topleft", legend=c("Survey Estimate", "State-space model", "Historical harvest data",
+                           "AMBCC harvest survey-C&T season"),
+       pch=c(16, 16, 1, 22), col=c(1, "gray50", 1, 1), pt.bg=c(NA, NA, NA, 1))
 ################################################################################
 ##
 ## Now fit the model with only data up to 2016 and with 2016 prior.
 ## This will give us the state of knowledge in 2016, given the current model (with small updates)
 # Specify JAGS Model
-sink("theta.logistic.emgo.2016.jags")
-cat("
-    model{
-    # Priors and constraints
-    q ~ dunif(0.01, 1) #harvest/population adjustment factor, #dunif(0.01, 1) worked
-    #dbeta(1, 5) or dunif(0, 1) or dbeta(2, 5)--did not converge in 1mil.   
-    c ~ dbeta(50, 150)    # c <- 0.25 for constant, distribution approx. from Dooley
-    r.max ~  dlnorm(log(0.09), 0.3)T(0, 0.2) #Prior for r max, approximated from Dooley report & 
-    #  pers. comm. on 5/9/16; allows some very high values to r.max > 0.3, try truncation;
-    #  also tried: dunif(0.05, 0.25), dunif(0, 0.2), and dunif(0, 0.3)
-    theta ~ dlnorm(log(1.76), 0.25)T(1, 3)  #theta-logistic parameter from Dooley report & pers. comm. on 5/9/16
-    # allow much too high theta values > 100 in posterior, try truncation 
-    #also used dunif(1,3)
-    CC ~ dunif(50000, 400000) #<-- converged but gives very high CC and upper tail on N.tot
-    #dunif(100000,250000) works but dlnorm(log(200000), 0.2)T(0, 400000) does not 
-    sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
-    tau.proc <- pow(sigma.proc, -2)
-    #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
-    m.har ~ dnorm(4081, 0.00001) #mean harvest before AMBCC season; parameterized as kill in 2016
-    sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
-    for(t in 1:3){ 
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate harvest to kill
-    }
-    har[4] ~ dnorm(m.har, 1/sigma.har^2) #year 1988, latent state process harvest
-    kill[4] <- har[4]/(1 - c)
-    for(t in 5:18){ 
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate harvest to kill
-    }
-    har[19] ~ dnorm(m.har, 1/sigma.har^2) #year 2003
-    kill[19] <- har[19]/(1 - c)
-    for(t in 20:27){ 
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate harvest to kill
-    }
-    
-    har[28] ~ dnorm(m.har, 1/sigma.har^2) #year 2012 missing,
-    kill[28] <- har[28]/(1 - c)
-    tau.sur[29] <- pow(sigma.sur[29], -2)
-    har[29] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest year 2013 in data,
-    har.sur[29] ~ dnorm(har[29], tau.sur[29]) #likelihood
-    kill[29] <- har[29]/(1 - c)
-    har[30] ~ dnorm(m.har, 1/sigma.har^2) #year 2014 missing,
-    kill[30] <- har[30]/(1 - c)
-    
-    for(t in 31:T){ #T is last data year before start of AMBCC season
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate harvest to kill
-    }
-    mu.green ~ dlnorm(pmu.mean, pmu.tau) #prior for harvest under green policy
-
-    # Likelihood
-    # State process
-    P[1] ~ dunif(0, 0.5)                      # Prior for initial population size
-    P.true[1] ~ dlnorm(log(P[1]), tau.proc)
-    for (t in 1:(T-1)){
-    fk[t] <- (1 - exp(-0.0001*P.true[t]*CC))*kill[t]  #functional response of hunters
-    P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - fk[t]/CC, 1e-5)
-    P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
-    }
-    # Observation process
-    for (t in 1:T) {
-    logN.est[t] <- log(q) + log(P.true[t]) + log(CC)
-    mu[t] <- logN.est[t] 
-    tau.obs[t] <- pow(sigma.obs[t],-2)
-    y[t] ~ dnorm(exp(mu[t]), tau.obs[t])
-    }
-    # Population sizes on real scale
-    for (t in 1:T) {
-    N.est[t] <- exp(logN.est[t])
-    N.tot[t] <- N.est[t]/q
-    }
-    }
-    ",fill = TRUE)
-sink()
-
-## modify data for pre-2017
-jags.data0 <- jags.data
-jags.data0$y <- jags.data$y[1:32]
-jags.data0$sigma.obs <- jags.data$sigma.obs[1:32]
-jags.data0$har.sur <- jags.data$har.sur[1:32]
-jags.data0$sigma.sur <- jags.data$sigma.sur[1:32]
-
-# Call JAGS from R
-#out0 is with original prior on mu.green and data from 1985 to 2016
-#note that this is not the exact model or data fit in 2016
-# minor improvement made to model and minor data quality issue fixed in harvest and YKD count data
-#model now includes SE for harvest data
-out0 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.2016.jags", 
-            n.chains = 4, n.thin = 4, n.iter = 2400000, n.burnin = 2000000, n.adapt=10000,
-            parallel=TRUE)
-saveRDS(out0, file = "out0.harOriginal.RDS")
+# sink("theta.logistic.emgo.2016.jags")
+# cat("
+#     model{
+#     # Priors and constraints
+#     q ~ dunif(0.01, 1) #harvest/population adjustment factor, #dunif(0.01, 1) worked
+#     #dbeta(1, 5) or dunif(0, 1) or dbeta(2, 5)--did not converge in 1mil.   
+#     c ~ dbeta(50, 150)    # c <- 0.25 for constant, distribution approx. from Dooley
+#     r.max ~  dlnorm(log(0.09), 0.3)T(0, 0.2) #Prior for r max, approximated from Dooley report & 
+#     #  pers. comm. on 5/9/16; allows some very high values to r.max > 0.3, try truncation;
+#     #  also tried: dunif(0.05, 0.25), dunif(0, 0.2), and dunif(0, 0.3)
+#     theta ~ dlnorm(log(1.76), 0.25)T(1, 3)  #theta-logistic parameter from Dooley report & pers. comm. on 5/9/16
+#     # allow much too high theta values > 100 in posterior, try truncation 
+#     #also used dunif(1,3)
+#     CC ~ dunif(50000, 400000) #<-- converged but gives very high CC and upper tail on N.tot
+#     #dunif(100000,250000) works but dlnorm(log(200000), 0.2)T(0, 400000) does not 
+#     sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
+#     tau.proc <- pow(sigma.proc, -2)
+#     #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021, 2022
+#     m.har ~ dnorm(4081, 0.00001) #mean harvest before AMBCC season; parameterized as kill in 2016
+#     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
+#     for(t in 1:3){ 
+#       tau.sur[t] <- pow(sigma.sur[t], -2)
+#       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
+#       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
+#       kill[t] <- har[t]/(1 - c) #translate harvest to kill
+#     }
+#     har[4] ~ dnorm(m.har, 1/sigma.har^2) #year 1988, latent state process harvest
+#     kill[4] <- har[4]/(1 - c)
+#     for(t in 5:18){ 
+#       tau.sur[t] <- pow(sigma.sur[t], -2)
+#       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
+#       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
+#       kill[t] <- har[t]/(1 - c) #translate harvest to kill
+#     }
+#     har[19] ~ dnorm(m.har, 1/sigma.har^2) #year 2003
+#     kill[19] <- har[19]/(1 - c)
+#     for(t in 20:27){ 
+#       tau.sur[t] <- pow(sigma.sur[t], -2)
+#       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
+#       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
+#       kill[t] <- har[t]/(1 - c) #translate harvest to kill
+#     }
+#     
+#     har[28] ~ dnorm(m.har, 1/sigma.har^2) #year 2012 missing,
+#     kill[28] <- har[28]/(1 - c)
+#     tau.sur[29] <- pow(sigma.sur[29], -2)
+#     har[29] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest year 2013 in data,
+#     har.sur[29] ~ dnorm(har[29], tau.sur[29]) #likelihood
+#     kill[29] <- har[29]/(1 - c)
+#     har[30] ~ dnorm(m.har, 1/sigma.har^2) #year 2014 missing,
+#     kill[30] <- har[30]/(1 - c)
+#     
+#     for(t in 31:T){ #T is last data year before start of AMBCC season
+#       tau.sur[t] <- pow(sigma.sur[t], -2)
+#       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
+#       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
+#       kill[t] <- har[t]/(1 - c) #translate harvest to kill
+#     }
+#     mu.green ~ dlnorm(pmu.mean, pmu.tau) #prior for harvest under green policy
+# 
+#     # Likelihood
+#     # State process
+#     P[1] ~ dunif(0, 0.5)                      # Prior for initial population size
+#     P.true[1] ~ dlnorm(log(P[1]), tau.proc)
+#     for (t in 1:(T-1)){
+#     fk[t] <- (1 - exp(-0.0001*P.true[t]*CC))*kill[t]  #functional response of hunters
+#     P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - fk[t]/CC, 1e-5)
+#     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
+#     }
+#     # Observation process
+#     for (t in 1:T) {
+#     logN.est[t] <- log(q) + log(P.true[t]) + log(CC)
+#     mu[t] <- logN.est[t] 
+#     tau.obs[t] <- pow(sigma.obs[t],-2)
+#     y[t] ~ dnorm(exp(mu[t]), tau.obs[t])
+#     }
+#     # Population sizes on real scale
+#     for (t in 1:T) {
+#     N.est[t] <- exp(logN.est[t])
+#     N.tot[t] <- N.est[t]/q
+#     }
+#     }
+#     ",fill = TRUE)
+# sink()
+# 
+# ## modify data for pre-2017
+# jags.data0 <- jags.data
+# jags.data0$y <- jags.data$y[1:32]
+# jags.data0$sigma.obs <- jags.data$sigma.obs[1:32]
+# jags.data0$har.sur <- jags.data$har.sur[1:32]
+# jags.data0$sigma.sur <- jags.data$sigma.sur[1:32]
+# 
+# # Call JAGS from R
+# #out0 is with original prior on mu.green and data from 1985 to 2016
+# #note that this is not the exact model or data fit in 2016
+# # minor improvement made to model and minor data quality issue fixed in harvest and YKD count data
+# #model now includes SE for harvest data
+# out0 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.2016.jags", 
+#             n.chains = 4, n.thin = 4, n.iter = 2400000, n.burnin = 2000000, n.adapt=10000,
+#             parallel=TRUE)
+# saveRDS(out0, file = "out0.harOriginal.RDS")
