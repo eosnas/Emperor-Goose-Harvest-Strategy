@@ -35,6 +35,7 @@
 ## 20230531 (1) experimented with priors; modified figure code to plot results
 ##          (2) explored the effect of a variance inflation factor in likelihood (VIF);
 ##              explored heterogeneity term in mu[i]
+##          (3) found bug in model!, index for logN.est is wrong. Fixed 
 ################################
 # Data
 library(jagsUI)
@@ -102,7 +103,7 @@ sink("theta.logistic.emgo.jags")
 cat("
     model{
     # Priors and constraints
-    q ~ dbeta(2, 5) #dunif(0.01, 1) #harvest/population adjustment factor, 
+    q ~ dunif(0.01, 1) #dbeta(2, 5)  #harvest/population adjustment factor, 
     #dunif(0.01, 1) also converged 
     c ~ dbeta(50, 150)    # c <- 0.25 for constant, distribution approx. from Dooley
     r.max ~  dlnorm(log(0.09), 0.3)T(0, 0.2) #Prior for r max, approximated from Dooley report & 
@@ -158,6 +159,12 @@ cat("
     P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - fk[t]/CC, 1e-5)
     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
     }
+    # Population sizes on real scale
+    for (t in 1:(T+H)) {
+      logN.est[t] <- log(q) + log(P.true[ t ]) + log(CC)
+      N.est[t] <- exp(logN.est[t])
+      N.tot[t] <- N.est[t]/q
+    }
     # Observation process
     sd.obs ~ dunif(0.001, 10000)
     for(i in 1:NObs){
@@ -168,33 +175,27 @@ cat("
     tau.esp <- pow(sd.esp, -2)
     for (i in 1:(Num - 2)) {
       esp[i] ~ dnorm(0, tau.esp)
-      logN.est[i] <- log(q) + log(P.true[ Year[i] ]) + log(CC)
-      mu[i] <- exp(logN.est[i]) + alpha1[Obs[i]]
-      #mu[i] <- exp(logN.est[i]) + alpha1[Obs[i]] + esp[i]
+      mu[i] <- exp(logN.est[ Year[i] ])
+      #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]]
+      #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
       tau.obs[i] <- pow(sigma.obs[i],-2)
-      y[i] ~ dnorm(mu[i], tau.obs[i]/VIF) #likelihood
-      #y[i] ~ dnorm(mu[i], tau.obs[i]) #likelihood
+      #y[i] ~ dnorm(mu[i], tau.obs[i]/VIF) #likelihood
+      y[i] ~ dnorm(mu[i], tau.obs[i]) #likelihood
     }
    
     #year 2020, missing
     for(i in (Num-1):Num){ #Add observer effects
     esp[i] ~ dnorm(0, tau.esp)
-    logN.est[i] <- log(q) + log(P.true[ Year[i] ]) + log(CC)
-    mu[i] <- logN.est[Year[i]] + alpha1[Obs[i]]
-    #mu[i] <- logN.est[Year[i]] + alpha1[Obs[i]] + esp[i]
+    mu[i] <- exp(logN.est[ Year[i] ])
+    #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]]
+    #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
     # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
     beta.se[i] ~ dnorm(BETA, 1/SE^2)           #from linear model
     s[i] ~ dchisq(DF) 
-    sigma.obs.missing[i] ~ dnorm(beta.se[i]*exp(mu[i]), s[i]/((SIGMA^2)*DF) ) #from linear model
+    sigma.obs.missing[i] ~ dnorm(beta.se[i]*mu[i], s[i]/((SIGMA^2)*DF) ) #from linear model
     tau.obs[i] <- pow(sigma.obs.missing[i],-2)
-    y[i] ~ dnorm(mu[i], tau.obs[i]/VIF)
-    #y[i] ~ dnorm(mu[i], tau.obs[i])
-    }
-    
-    # Population sizes on real scale
-    for (t in 1:(T+H)) {
-      N.est[t] <- exp(logN.est[t])
-      N.tot[t] <- N.est[t]/q
+    #y[i] ~ dnorm(mu[i], tau.obs[i]/VIF)
+    y[i] ~ dnorm(mu[i], tau.obs[i])
     }
     }
     ",fill = TRUE)
