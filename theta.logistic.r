@@ -175,9 +175,9 @@ cat("
     tau.esp <- pow(sd.esp, -2)
     for (i in 1:(Num - 2)) {
       esp[i] ~ dnorm(0, tau.esp)
-      mu[i] <- exp(logN.est[ Year[i] ])
+      #mu[i] <- exp(logN.est[ Year[i] ])
       #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]]
-      #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
+      mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
       tau.obs[i] <- pow(sigma.obs[i],-2)
       #y[i] ~ dnorm(mu[i], tau.obs[i]/VIF) #likelihood
       y[i] ~ dnorm(mu[i], tau.obs[i]) #likelihood
@@ -186,9 +186,9 @@ cat("
     #year 2020, missing
     for(i in (Num-1):Num){ #Add observer effects
     esp[i] ~ dnorm(0, tau.esp)
-    mu[i] <- exp(logN.est[ Year[i] ])
+    #mu[i] <- exp(logN.est[ Year[i] ])
     #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]]
-    #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
+    mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
     # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
     beta.se[i] ~ dnorm(BETA, 1/SE^2)           #from linear model
     s[i] ~ dchisq(DF) 
@@ -234,7 +234,7 @@ parameters <- c("r.max", "sigma.proc", "N.est", "CC", "theta", "q", "N.tot",
                 "VIF", "sd.esp")
 # Call JAGS from R
 #out is with original prior on mu.green
-out1 <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
+out <- jags(jags.data, inits, parameters, "theta.logistic.emgo.jags", 
             n.chains = 4, n.thin = 2, n.iter = 110000, n.burnin = 9000, n.adapt=1000,
             parallel=TRUE)
 saveRDS(out1, file = "out1.harOriginal.RDS")

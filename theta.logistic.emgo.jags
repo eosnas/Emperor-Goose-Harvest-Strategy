@@ -73,9 +73,9 @@
     tau.esp <- pow(sd.esp, -2)
     for (i in 1:(Num - 2)) {
       esp[i] ~ dnorm(0, tau.esp)
-      mu[i] <- exp(logN.est[ Year[i] ])
+      #mu[i] <- exp(logN.est[ Year[i] ])
       #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]]
-      #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
+      mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
       tau.obs[i] <- pow(sigma.obs[i],-2)
       #y[i] ~ dnorm(mu[i], tau.obs[i]/VIF) #likelihood
       y[i] ~ dnorm(mu[i], tau.obs[i]) #likelihood
@@ -84,9 +84,9 @@
     #year 2020, missing
     for(i in (Num-1):Num){ #Add observer effects
     esp[i] ~ dnorm(0, tau.esp)
-    mu[i] <- exp(logN.est[ Year[i] ])
+    #mu[i] <- exp(logN.est[ Year[i] ])
     #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]]
-    #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
+    mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
     # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
     beta.se[i] ~ dnorm(BETA, 1/SE^2)           #from linear model
     s[i] ~ dchisq(DF) 

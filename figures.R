@@ -1,7 +1,7 @@
 # code for NAAG figures
 # Must run theta.logistic.r code to format data
 library(tidyverse)
-out <- out1
+out <- out.eps
 out
 df <- data.frame(Year = 1985:2022, N = out$mean$N.est, upper = out$q97.5$N.est, 
                  lower = out$q2.5$N.est)
@@ -12,7 +12,9 @@ ggplot(data=ykd) +
   #                                  color=Season, shape = Type)) + 
   # geom_point(data = har2, aes(x=Year, y=PermitHar, color = Season, shape = Type)) + 
   geom_pointrange(data = df, aes(x=Year, y = N, ymin = lower, ymax = upper)) + 
-  labs(y = "Indicated Total Birds/Harvest")
+  labs(y = "Indicated Total Birds/Harvest", title = "Model Eps") + 
+  geom_pointrange(data = index, aes(x=Year+0.2, y = itotal, ymin = itotal - 2*itotal.se, 
+                                    ymax = itotal + 2*itotal.se), color = "red")
 #plot observer effects
 df <- data.frame(Observer = levels(factor(ykd$Observer)), Effect = out$mean$alpha1, 
                  upper = out$q2.5$alpha1, lower = out$q97.5$alpha1) 
