@@ -1,8 +1,8 @@
 
     model{
     # Priors and constraints
-    q ~ dunif(0.01, 1) #harvest/population adjustment factor, #dunif(0.01, 1) worked
-    #dbeta(1, 5) or dunif(0, 1) or dbeta(2, 5)--did not converge in 1mil.   
+    q ~ dunif(0.01, 1) #dbeta(2, 5)  #harvest/population adjustment factor, 
+    #dunif(0.01, 1) also converged 
     c ~ dbeta(50, 150)    # c <- 0.25 for constant, distribution approx. from Dooley
     r.max ~  dlnorm(log(0.09), 0.3)T(0, 0.2) #Prior for r max, approximated from Dooley report & 
     #  pers. comm. on 5/9/16; allows some very high values to r.max > 0.3, try truncation;
@@ -12,88 +12,88 @@
     #also used dunif(1,3)
     CC ~ dunif(50000, 400000) #<-- converged but gives very high CC and upper tail on N.tot
     #dunif(100000,250000) works but dlnorm(log(200000), 0.2)T(0, 400000) does not 
-    sigma.proc ~ dunif(0, 0.3)                    # Prior for sd of state process
+    sigma.proc ~ dunif(0, 0.3)  # Prior for sd of state process, might try a gamma
     tau.proc <- pow(sigma.proc, -2)
-    #hierarchical model of missing harvest data: 1988, 2003, 2012, 2014, 2020, 2021 
-    m.har ~ dnorm(4081, 0.00001) #mean harvest before AMBCC season
+    
+    #hierarchical model of missing harvest data: 2020, 2021, 2022
+    #Do we need to take into account the relative timeing of the harvest and survey??
+    m.har ~ dnorm(3579, 0.00001) #mean harvest before AMBCC season (1987:2016)
+    m.har.old ~ dnorm(5839, 1/700^2)  #mean and sd of harvest before season was closed, 1985:1986
     sigma.har ~ dunif(0, 3000) #process SD in harvest across years, shared between all years
-    for(t in 1:3){ 
+    for(t in 1:2){ 
+      tau.sur[t] <- pow(sigma.sur[t], -2)
+      har[t] ~ dnorm(m.har.old, 1/sigma.har^2) #latent state process harvest
+      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
+      kill[t] <- har[t]/(1 - c) #translate harvest to kill
+    }
+    for(t in 3:T){ #T is last data year before start of AMBCC season
       tau.sur[t] <- pow(sigma.sur[t], -2)
       har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
       har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate kill to harvest
+      kill[t] <- har[t]/(1 - c) #translate harvest to kill
     }
-    har[4] ~ dnorm(m.har, 1/sigma.har^2) #year 1988, latent state process harvest
-    kill[4] <- har[4]/(1 - c)
-    for(t in 5:18){ 
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate kill to harvest
-    }
-    har[19] ~ dnorm(m.har, 1/sigma.har^2) #year 2003
-    kill[19] <- har[19]/(1 - c)
-    for(t in 20:27){ 
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate kill to harvest
-    }
-    for( t in 28:30){
-        har[t] ~ dnorm(m.har, 1/sigma.har^2) #years 2012, 2013, and 2014
-        kill[t] <- har[t]/(1 - c)
-    }
-    for(t in 31:T){ #T is number of data years before start of AMBCC season
-      tau.sur[t] <- pow(sigma.sur[t], -2)
-      har[t] ~ dnorm(m.har, 1/sigma.har^2) #latent state process harvest
-      har.sur[t] ~ dnorm(har[t], tau.sur[t]) #likelihood
-      kill[t] <- har[t]/(1 - c) #translate kill to harvest
-    }
-    mu.green ~ dlnorm(log(15000), 1/(0.2)^2) #prior for harvest under green policy
-    for(h in 1:3){ #H is the number of harvest years, currently 3 are observed with harvest data, 5 total
+    mu.green ~ dlnorm(pmu.mean, pmu.tau) #prior for harvest under green policy
+    m.har.p ~ dnorm(150, 1/50^2)         #priors for permit harvest
+    sd.har.p ~ dunif(0.01, 100)
+    tau.har.p <- pow(sd.har.p, -2)
+    for(h in 1:3){ #h is the number of harvest years with data, 
+                   #currently 3 are observed for subsistence; 6 for permits
       tau.sur[T+h] <- pow(sigma.sur[T+h], -2)
-      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process harvest
+      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #latent state process for harvest
       har.sur[T+h] ~ dnorm(har[T+h], tau.sur[T+h]) #likelihood
-      kill[T+h] <- har[T+h]/(1 - c) #translate kill to harvest
+      har.p[T+h] ~ dnorm(m.har.p, tau.har.p) #likelihood, no latent state process, observed without error
+      kill[T+h] <- (har[T+h] + har.p[T+h])/(1 - c) #translate harvest to kill
     }
     for( h in 4:H){
-      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #years 2020 and 2021
-      kill[T+h] <- har[T+h]/(1 - c)
+      har[T+h] ~ dnorm(mu.green, 1/sigma.har^2) #years 2020 to present
+      har.p[T+h] ~ dnorm(m.har.p, tau.har.p)
+      kill[T+h] <- (har[T+h] + har.p[T+h])/(1 - c)
     }
-    # Likelihood
     # State process
     P[1] ~ dunif(0, 0.5)                      # Prior for initial population size
     P.true[1] ~ dlnorm(log(P[1]), tau.proc)
     for (t in 1:(T+H-1)){
-    P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - kill[t]/CC, 1e-5)
+    fk[t] <- (1 - exp(-0.0001*P.true[t]*CC))*kill[t]  #functional response of hunters
+    P[t+1] <- max(P.true[t] + r.max*P.true[t]*(1 - P.true[t]^theta) - fk[t]/CC, 1e-5)
     P.true[t+1] ~ dlnorm(log(P[t+1]), tau.proc)
     }
-    # Observation process
-    for (t in 1:(T+3)) {
-    logN.est[t] <- log(q) + log(P.true[t]) + log(CC)
-    mu[t] <- logN.est[t] 
-    tau.obs[t] <- pow(sigma.obs[t],-2)
-    y[t] ~ dnorm(exp(mu[t]), tau.obs[t])
-    }
-    #year 2020, missing
-    logN.est[T+4] <- log(q) + log(P.true[T+4]) + log(CC)
-    mu[T+4] <- logN.est[T+4] 
-    # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
-    beta.se ~ dnorm(BETA, 1/SE^2)           #from linear model
-    s ~ dchisq(DF) 
-    sigma.obs.missing ~ dnorm(beta.se*exp(mu[T+4]), s/((SIGMA^2)*DF) ) #from linear model
-    tau.obs[T+4] <- pow(sigma.obs.missing,-2)
-    y[T+4] ~ dnorm(exp(mu[T+4]), tau.obs[T+4])
-    #year 2021 
-    logN.est[T+H] <- log(q) + log(P.true[T+H]) + log(CC)
-    mu[T+H] <- logN.est[T+H] 
-    tau.obs[T+H] <- pow(sigma.obs[T+H],-2)
-    y[T+H] ~ dnorm(exp(mu[T+H]), tau.obs[T+H])
-    
     # Population sizes on real scale
     for (t in 1:(T+H)) {
-    N.est[t] <- exp(logN.est[t])
-    N.tot[t] <- N.est[t]/q
+      logN.est[t] <- log(q) + log(P.true[ t ]) + log(CC)
+      N.est[t] <- exp(logN.est[t])
+      N.tot[t] <- N.est[t]/q
+    }
+    # Observation process
+    sd.obs ~ dunif(0.001, 10000)
+    for(i in 1:NObs){
+      alpha1[i] ~ dnorm(0, 1/sd.obs^2)
+    }
+    VIF ~ dgamma(1, 1)  #prior for variance inflation factor
+    sd.esp ~ dgamma(1, 0.0001)  #prior for excess heterogeneity
+    tau.esp <- pow(sd.esp, -2)
+    for (i in 1:(Num - 2)) {
+      esp[i] ~ dnorm(0, tau.esp)
+      #mu[i] <- exp(logN.est[ Year[i] ])
+      #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]]
+      mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
+      tau.obs[i] <- pow(sigma.obs[i],-2)
+      #y[i] ~ dnorm(mu[i], tau.obs[i]/VIF) #likelihood
+      y[i] ~ dnorm(mu[i], tau.obs[i]) #likelihood
+    }
+   
+    #year 2020, missing
+    for(i in (Num-1):Num){ #Add observer effects
+    esp[i] ~ dnorm(0, tau.esp)
+    #mu[i] <- exp(logN.est[ Year[i] ])
+    #mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]]
+    mu[i] <- exp(logN.est[ Year[i] ]) + alpha1[Obs[i]] + esp[i]
+    # predict new observation, see https://github.com/USFWS/State-Space-Prediction-2020
+    beta.se[i] ~ dnorm(BETA, 1/SE^2)           #from linear model
+    s[i] ~ dchisq(DF) 
+    sigma.obs.missing[i] ~ dnorm(beta.se[i]*mu[i], s[i]/((SIGMA^2)*DF) ) #from linear model
+    tau.obs[i] <- pow(sigma.obs.missing[i],-2)
+    #y[i] ~ dnorm(mu[i], tau.obs[i]/VIF)
+    y[i] ~ dnorm(mu[i], tau.obs[i])
     }
     }
     
